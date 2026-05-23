@@ -8,8 +8,13 @@ import dotenv from "dotenv";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Load environment variables from the project's .env file
-dotenv.config({ path: path.join(__dirname, ".env") });
+// Check if we are running from within dist or project root
+const isDistDir = path.basename(__dirname) === "dist";
+const rootPath = isDistDir ? path.join(__dirname, "..") : __dirname;
+const distPath = isDistDir ? __dirname : path.join(__dirname, "dist");
+
+// Load environment variables from the project's .env file (fallback to project root)
+dotenv.config({ path: path.join(rootPath, ".env") });
 
 async function startServer() {
   const app = express();
@@ -26,12 +31,11 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
-  const distPath = path.join(__dirname, "dist");
   const isProduction = process.env.NODE_ENV === "production" && fs.existsSync(distPath);
 
   if (!isProduction) {
     const vite = await createViteServer({
-      root: __dirname,
+      root: rootPath,
       server: { middlewareMode: true },
       appType: "spa",
     });
@@ -39,7 +43,20 @@ async function startServer() {
   } else {
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+      const htmlPath = path.join(distPath, "index.html");
+      if (fs.existsSync(htmlPath)) {
+        let html = fs.readFileSync(htmlPath, "utf8");
+        const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
+        const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || "";
+        
+        // Dynamically inject variables into the script block
+        html = html.replace("__VITE_SUPABASE_URL__", supabaseUrl);
+        html = html.replace("__VITE_SUPABASE_ANON_KEY__", supabaseAnonKey);
+        
+        res.send(html);
+      } else {
+        res.status(404).send("Not Found");
+      }
     });
   }
 

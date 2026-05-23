@@ -601,7 +601,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     
     if (isSupabaseConfigured && supabase) {
       try {
-        const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || '';
+        const getEnvVar = (name: string, buildTimeValue: string): string => {
+          const runtimeValue = (window as any).__ENV__?.[name];
+          if (runtimeValue && runtimeValue !== `__${name}__`) return runtimeValue;
+          return buildTimeValue;
+        };
+        const supabaseUrl = getEnvVar('VITE_SUPABASE_URL', import.meta.env.VITE_SUPABASE_URL || '');
         const { data: sessionData } = await supabase.auth.getSession();
         
         await fetch(`${supabaseUrl}/functions/v1/send-email`, {
