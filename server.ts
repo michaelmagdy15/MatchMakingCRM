@@ -26,6 +26,18 @@ async function startServer() {
     next();
   });
 
+  // Secure environment check endpoint (checks existence of keys, hides raw values)
+  app.get("/api/env-check", (req, res) => {
+    res.json({
+      status: "ok",
+      NODE_ENV: process.env.NODE_ENV || "not-set",
+      has_VITE_SUPABASE_URL: !!process.env.VITE_SUPABASE_URL,
+      has_VITE_SUPABASE_ANON_KEY: !!process.env.VITE_SUPABASE_ANON_KEY,
+      has_SUPABASE_URL: !!process.env.SUPABASE_URL,
+      has_SUPABASE_ANON_KEY: !!process.env.SUPABASE_ANON_KEY,
+    });
+  });
+
   // API routes go here
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
@@ -47,8 +59,10 @@ async function startServer() {
       const htmlPath = path.join(distPath, "index.html");
       if (fs.existsSync(htmlPath)) {
         let html = fs.readFileSync(htmlPath, "utf8");
-        const supabaseUrl = process.env.VITE_SUPABASE_URL || "";
-        const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || "";
+        
+        // Fallback to non-VITE prefixed environment variables
+        const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+        const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
         
         // Dynamically inject variables into the script block
         html = html.replace("__VITE_SUPABASE_URL__", supabaseUrl);
