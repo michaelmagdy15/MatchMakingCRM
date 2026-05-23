@@ -31,7 +31,8 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
-  const isProduction = process.env.NODE_ENV === "production" && fs.existsSync(distPath);
+  // Determine if we are running in production mode
+  const isProduction = isDistDir || process.env.NODE_ENV === "production" || fs.existsSync(path.join(distPath, "index.html"));
 
   if (!isProduction) {
     const vite = await createViteServer({
