@@ -3,9 +3,13 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
+import dotenv from "dotenv";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Load environment variables from the project's .env file
+dotenv.config({ path: path.join(__dirname, ".env") });
 
 async function startServer() {
   const app = express();
@@ -22,17 +26,17 @@ async function startServer() {
     res.json({ status: "ok" });
   });
 
-  const distPath = path.join(process.cwd(), "dist");
+  const distPath = path.join(__dirname, "dist");
   const isProduction = process.env.NODE_ENV === "production" && fs.existsSync(distPath);
 
   if (!isProduction) {
     const vite = await createViteServer({
+      root: __dirname,
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
       res.sendFile(path.join(distPath, "index.html"));

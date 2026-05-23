@@ -209,3 +209,61 @@ CREATE INDEX IF NOT EXISTS idx_matches_lady_id ON matches(lady_id);
 CREATE INDEX IF NOT EXISTS idx_matches_gentleman_id ON matches(gentleman_id);
 CREATE INDEX IF NOT EXISTS idx_matches_status ON matches(status);
 CREATE INDEX IF NOT EXISTS idx_audit_logs_timestamp ON audit_logs(timestamp DESC);
+
+-- 11. MATCH MEETINGS TABLE (Attendances)
+CREATE TABLE IF NOT EXISTS match_meetings (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  client_id UUID NOT NULL REFERENCES profiles(id) ON DELETE CASCADE,
+  match_id UUID REFERENCES matches(id) ON DELETE CASCADE,
+  branch VARCHAR(50) NOT NULL,
+  date TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+  recorded_by UUID REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- 12. SALES TARGETS TABLE
+CREATE TABLE IF NOT EXISTS user_targets (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  month VARCHAR(50) NOT NULL,
+  target_amount NUMERIC DEFAULT 0,
+  target_total_private NUMERIC DEFAULT 0,
+  target_total_group NUMERIC DEFAULT 0,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 13. MATCHMAKERS TABLE
+CREATE TABLE IF NOT EXISTS matchmakers (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name VARCHAR(255) NOT NULL,
+  active BOOLEAN DEFAULT TRUE,
+  created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- 14. SAFE TRANSACTIONAL AUTO-GENERATOR TRIGGER FOR CANDIDATE CODES
+CREATE OR REPLACE FUNCTION generate_next_candidate_code()
+RETURNS TRIGGER AS $$
+DECLARE
+  suffix_num INT;
+  prefix CHAR(1);
+BEGIN
+  -- Only execute if a code is not provided or is blank
+  IF NEW.code IS NULL OR NEW.code = '' THEN
+    prefix := CASE WHEN NEW.gender = 'Female' THEN 'L' ELSE 'G' END;
+    
+    -- Extract max numerical suffix safely under transaction locks
+    SELECT COALESCE(MAX(NULLIF(regexp_replace(code, '\D', '', 'g'), '')::INT), 100)
+    INTO suffix_num
+    FROM profiles
+    WHERE code SIMILAR TO prefix || '[0-9]+';
+    
+    NEW.code := prefix || (suffix_num + 1);
+  END IF;
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE OR REPLACE TRIGGER trg_generate_candidate_code
+BEFORE INSERT ON profiles
+FOR EACH ROW
+EXECUTE FUNCTION generate_next_candidate_code();
+

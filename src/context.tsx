@@ -749,6 +749,55 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           notes: updates.notes || oldMatch.notes || 'Match succeeded!'
         });
       }
+
+      // 3. Trigger 1-Week Follow-up task when match becomes active
+      const wasActive = oldMatch.status === 'MATCH_ACTIVE';
+      const isActiveNow = updates.status === 'MATCH_ACTIVE';
+      if (!wasActive && isActiveNow) {
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + 7);
+        const assignedAdminId = oldMatch.responsibleAdminId || currentUser?.id || 'admin-sarah';
+        
+        await addTask({
+          title: `[Matchmaker Follow-up] 1-Week Check for Match #${id} (${ladyCode} & ${gentlemanCode})`,
+          description: `Conduct a 1-Week follow-up call with Gentleman ${gentlemanCode} (${oldMatch.maleName}) and Lady ${ladyCode} (${oldMatch.femaleName}) to see how their direct connection is going.`,
+          dueDate: dueDate.toISOString(),
+          status: 'Pending',
+          priority: 'High',
+          clientId: oldMatch.maleId,
+          assignedTo: assignedAdminId
+        });
+      }
+
+      // 4. Trigger 1-Month Follow-up when 1-Week check is completed
+      if (updates.firstCheck && oldMatch.firstCheck === 'Pending' && updates.firstCheck !== 'Pending') {
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + 30);
+        await addTask({
+          title: `[Matchmaker Follow-up] 1-Month Check for Match #${id} (${ladyCode} & ${gentlemanCode})`,
+          description: `Conduct a 1-Month check-in with the couple to track their mutual match progress. Current 1-Week status: ${updates.firstCheck}`,
+          dueDate: dueDate.toISOString(),
+          status: 'Pending',
+          priority: 'Medium',
+          clientId: oldMatch.maleId,
+          assignedTo: oldMatch.responsibleAdminId || currentUser?.id || 'admin-sarah'
+        });
+      }
+
+      // 5. Trigger 3-Month Follow-up when 1-Month check is completed
+      if (updates.secondCheck && oldMatch.secondCheck === 'Pending' && updates.secondCheck !== 'Pending') {
+        const dueDate = new Date();
+        dueDate.setDate(dueDate.getDate() + 90);
+        await addTask({
+          title: `[Matchmaker Follow-up] 3-Month Check for Match #${id} (${ladyCode} & ${gentlemanCode})`,
+          description: `Conduct a 3-Month relationship review with the couple. Current 1-Month status: ${updates.secondCheck}`,
+          dueDate: dueDate.toISOString(),
+          status: 'Pending',
+          priority: 'Medium',
+          clientId: oldMatch.maleId,
+          assignedTo: oldMatch.responsibleAdminId || currentUser?.id || 'admin-sarah'
+        });
+      }
     }
   };
 
@@ -919,8 +968,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     if (isSupabaseConfigured && supabase) {
       await supabase.from('profiles').delete().eq('import_batch_id', batchId);
     }
-    setBaseClients(prev => prev.filter(c => c.importBatchId !== batchId));
-    setImportBatches(prev => prev.filter(b => b.id !== batchId));
+    
+    const updatedClients = baseClients.filter(c => c.importBatchId !== batchId);
+    const updatedBatches = importBatches.filter(b => b.id !== batchId);
+
+    setBaseClients(updatedClients);
+    setImportBatches(updatedBatches);
+
+    if (!isSupabaseConfigured) {
+      localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(updatedClients));
+      localStorage.setItem(STORAGE_KEYS.BATCHES, JSON.stringify(updatedBatches));
+    }
     alert('Import rolled back successfully.');
   };
 

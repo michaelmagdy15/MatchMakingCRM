@@ -11,6 +11,15 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Client, MatchStatus } from './types';
 import { Input } from '@/components/ui/input';
 
+const validateGucId = (gucId: string): boolean => {
+  const regex = /^\d{2}-\d{4,6}$/;
+  return regex.test(gucId.trim());
+};
+
+const sanitizeGucId = (gucId: string): string => {
+  return gucId.trim().replace(/[_/]/g, '-');
+};
+
 interface ImportDataProps {
   type?: 'Lead' | 'Active' | 'Match';
   isOpen?: boolean;
@@ -39,6 +48,7 @@ export default function ImportData({ type = 'Lead', isOpen: controlledIsOpen, on
     { key: 'ladyCode', label: 'Lady Code (Required)', required: true },
     { key: 'notes', label: 'Notes' }
   ] : [
+    { key: 'code', label: 'Candidate Code (Optional - e.g. L101, G101)' },
     { key: 'fullName', label: 'Full Name (Required)', required: true },
     { key: 'phoneNumber', label: 'Phone Number (Required)', required: true },
     { key: 'gender', label: 'Gender (Required)', required: true },
@@ -136,6 +146,7 @@ export default function ImportData({ type = 'Lead', isOpen: controlledIsOpen, on
       ladyCode: ['lady code', 'ladycode', 'female code', 'femalecode', 'lady', 'female', 'l code', 'lcode', 'كود المرأة'],
       notes: ['notes', 'note', 'comment', 'comments', 'feedback', 'ملاحظات']
     } : {
+      code: ['code', 'id', 'member id', 'memberid', 'candidate code', 'كود'],
       fullName: ['full name', 'name', 'fullname', 'client', 'customer', 'candidate', 'profile', 'member', 'lead', 'اسم', 'الاسم'],
       phoneNumber: ['phone number', 'phone', 'mobile', 'number', 'tel', 'contact', 'whatsapp', 'رقم', 'تليفون'],
       gender: ['gender', 'sex', 'النوع', 'الجنس'],
@@ -227,6 +238,7 @@ export default function ImportData({ type = 'Lead', isOpen: controlledIsOpen, on
             ladyCode: ['lady code', 'ladycode', 'female code', 'femalecode', 'lady', 'female', 'l code', 'lcode', 'كود المرأة'],
             notes: ['notes', 'note', 'comment', 'comments', 'feedback', 'ملاحظات']
           } : {
+            code: ['code', 'id', 'member id', 'memberid', 'candidate code', 'كود'],
             fullName: ['full name', 'name', 'fullname', 'client', 'customer', 'candidate', 'profile', 'member', 'lead', 'اسم', 'الاسم'],
             phoneNumber: ['phone number', 'phone', 'mobile', 'number', 'tel', 'contact', 'whatsapp', 'رقم', 'تليفون'],
             gender: ['gender', 'sex', 'النوع', 'الجنس'],
@@ -339,16 +351,16 @@ export default function ImportData({ type = 'Lead', isOpen: controlledIsOpen, on
 
           // Search gentleman in rawClients
           const gentleman = rawClients.find(c => 
-            c.gender === 'Male' && 
-            (c.code?.toLowerCase() === gentlemanCode.toLowerCase() || 
-             c.memberId?.toLowerCase() === gentlemanCode.toLowerCase())
+            (c.gender?.toLowerCase() === 'male' || c.gender?.toLowerCase() === 'gentleman') && 
+            ((c.code || '').toString().trim().toUpperCase() === gentlemanCode.toUpperCase() || 
+             (c.memberId || '').toString().trim().toUpperCase() === gentlemanCode.toUpperCase())
           );
 
           // Search lady in rawClients
           const lady = rawClients.find(c => 
-            c.gender === 'Female' && 
-            (c.code?.toLowerCase() === ladyCode.toLowerCase() || 
-             c.memberId?.toLowerCase() === ladyCode.toLowerCase())
+            (c.gender?.toLowerCase() === 'female' || c.gender?.toLowerCase() === 'lady') && 
+            ((c.code || '').toString().trim().toUpperCase() === ladyCode.toUpperCase() || 
+             (c.memberId || '').toString().trim().toUpperCase() === ladyCode.toUpperCase())
           );
 
           if (!gentleman) {
@@ -433,7 +445,8 @@ export default function ImportData({ type = 'Lead', isOpen: controlledIsOpen, on
         const codeVal = (c.memberId || c.code || '').toString().trim();
         if (!codeVal) return;
 
-        const femaleMatch = codeVal.match(/^[lL](\d+)$/);
+        // Matches L101, L-101, L_101, L 101 case-insensitively
+        const femaleMatch = codeVal.match(/^[lL]\s*[-_]?\s*(\d+)/);
         if (femaleMatch) {
           const num = parseInt(femaleMatch[1], 10);
           if (num >= nextFemaleSuffix) {
@@ -441,7 +454,7 @@ export default function ImportData({ type = 'Lead', isOpen: controlledIsOpen, on
           }
         }
 
-        const maleMatch = codeVal.match(/^[gG](\d+)$/);
+        const maleMatch = codeVal.match(/^[gG]\s*[-_]?\s*(\d+)/);
         if (maleMatch) {
           const num = parseInt(maleMatch[1], 10);
           if (num >= nextMaleSuffix) {
@@ -461,6 +474,7 @@ export default function ImportData({ type = 'Lead', isOpen: controlledIsOpen, on
         const nameCol = importMapping['fullName'] || importMapping['name'];
         const phoneCol = importMapping['phoneNumber'] || importMapping['phone'];
         const genderCol = importMapping['gender'];
+        const codeCol = importMapping['code'];
 
         const name = (nameCol ? row[nameCol] : '').toString().trim();
         const phone = (phoneCol ? row[phoneCol] : '').toString().replace(/[^\d+]/g, '');
@@ -471,10 +485,25 @@ export default function ImportData({ type = 'Lead', isOpen: controlledIsOpen, on
           continue;
         }
 
+        // Validate phone number format (between 7 and 15 digits)
+        const digitsOnly = phone.replace(/\+/g, '');
+        if (digitsOnly.length < 7 || digitsOnly.length > 15) {
+          failedCount++;
+          errors.push({ row: i + 1, reason: `Invalid phone number length: "${phone}" (must be between 7 and 15 digits)` });
+          continue;
+        }
+
+        // Prevent duplicate phone number in current import batch or existing candidates
+        const isDuplicatePhone = rawClients.some(c => c.phone?.replace(/[^\d+]/g, '') === phone || c.phoneNumber?.replace(/[^\d+]/g, '') === phone) ||
+                                 clientsToImport.some(c => c.phone?.replace(/[^\d+]/g, '') === phone);
+        if (isDuplicatePhone) {
+          failedCount++;
+          errors.push({ row: i + 1, reason: `Duplicate candidate record: phone number "${phone}" already exists in the system.` });
+          continue;
+        }
+
         const rawGender = (genderCol ? row[genderCol] : '').toString().trim();
         let gender = '';
-        let code = '';
-        let memberId = '';
 
         const genderLower = rawGender.toLowerCase();
         if (
@@ -486,9 +515,6 @@ export default function ImportData({ type = 'Lead', isOpen: controlledIsOpen, on
           genderLower === 'سيدة'
         ) {
           gender = 'Female';
-          code = `L${nextFemaleSuffix}`;
-          memberId = code;
-          nextFemaleSuffix++;
         } else if (
           genderLower === 'male' || 
           genderLower === 'gentleman' || 
@@ -498,13 +524,46 @@ export default function ImportData({ type = 'Lead', isOpen: controlledIsOpen, on
           genderLower === 'رجل'
         ) {
           gender = 'Male';
-          code = `G${nextMaleSuffix}`;
-          memberId = code;
-          nextMaleSuffix++;
         } else {
           failedCount++;
           errors.push({ row: i + 1, reason: `Invalid or missing Gender value: "${rawGender}" (must be Female/Lady or Male/Gentleman)` });
           continue;
+        }
+
+        // Determine Code / Member ID
+        let code = '';
+        let memberId = '';
+        if (codeCol && row[codeCol]) {
+          const customCode = row[codeCol].toString().trim().toUpperCase();
+          if (!/^[LG]\s*[-_]?\s*\d+$/i.test(customCode)) {
+            failedCount++;
+            errors.push({ row: i + 1, reason: `Invalid custom candidate code format: "${customCode}" (must start with L or G followed by numbers)` });
+            continue;
+          }
+
+          // Check if custom code already exists in rawClients or in current batch
+          const normalizedCustom = customCode.replace(/\s*[-_]?\s*/g, '');
+          const isDuplicateCode = rawClients.some(c => (c.code || c.memberId || '').toString().trim().toUpperCase().replace(/\s*[-_]?\s*/g, '') === normalizedCustom) ||
+                                  clientsToImport.some(c => (c.code || '').toUpperCase().replace(/\s*[-_]?\s*/g, '') === normalizedCustom);
+          if (isDuplicateCode) {
+            failedCount++;
+            errors.push({ row: i + 1, reason: `Duplicate candidate code: "${customCode}" already exists in the database` });
+            continue;
+          }
+
+          code = customCode;
+          memberId = customCode;
+        } else {
+          // Auto-generate sequential codes safely
+          if (gender === 'Female') {
+            code = `L${nextFemaleSuffix}`;
+            memberId = code;
+            nextFemaleSuffix++;
+          } else {
+            code = `G${nextMaleSuffix}`;
+            memberId = code;
+            nextMaleSuffix++;
+          }
         }
 
         const clientId = Math.random().toString(36).substr(2, 9);
@@ -525,17 +584,73 @@ export default function ImportData({ type = 'Lead', isOpen: controlledIsOpen, on
           assignedTo: currentUser?.role === 'rep' ? currentUser.id : undefined,
         };
 
+        // GUC ID robust validations & sanitization
+        const areYouGucianCol = importMapping['areYouGucian'];
+        const gucIdCol = importMapping['gucId'];
+        
+        const rawAreYouGucian = areYouGucianCol ? (row[areYouGucianCol] || '').toString().trim().toLowerCase() : '';
+        const rawGucId = gucIdCol ? (row[gucIdCol] || '').toString().trim() : '';
+
+        const isGucian = ['yes', 'y', 'true', '1', 'نعم', 'اه'].includes(rawAreYouGucian);
+        
+        if (isGucian) {
+          if (!rawGucId) {
+            failedCount++;
+            errors.push({ row: i + 1, reason: 'Candidate marked as Gucian but GUC ID is missing.' });
+            continue;
+          }
+          const sanitizedId = sanitizeGucId(rawGucId);
+          if (!validateGucId(sanitizedId)) {
+            failedCount++;
+            errors.push({ row: i + 1, reason: `Invalid GUC ID format: "${rawGucId}" (expected cohort format like 46-12345).` });
+            continue;
+          }
+          profileData.areYouGucian = 'Yes';
+          profileData.gucId = sanitizedId;
+        } else {
+          profileData.areYouGucian = 'No';
+          profileData.gucId = '';
+        }
+
         const ageCol = importMapping['age'];
         if (ageCol && row[ageCol] !== undefined && row[ageCol] !== null && row[ageCol] !== '') {
           const parsedAge = parseInt(row[ageCol].toString().trim(), 10);
-          if (!isNaN(parsedAge)) {
-            profileData.age = parsedAge;
-            profileData.finalAge = parsedAge;
+          if (isNaN(parsedAge) || parsedAge < 18 || parsedAge > 99) {
+            failedCount++;
+            errors.push({ row: i + 1, reason: `Invalid age: "${row[ageCol]}" (must be a number between 18 and 99).` });
+            continue;
           }
+          profileData.age = parsedAge;
+          profileData.finalAge = parsedAge;
+        }
+
+        // Email format validation
+        const emailCol = importMapping['email'];
+        if (emailCol && row[emailCol] !== undefined && row[emailCol] !== null && row[emailCol].toString().trim() !== '') {
+          const emailTrimmed = row[emailCol].toString().trim();
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(emailTrimmed)) {
+            failedCount++;
+            errors.push({ row: i + 1, reason: `Invalid email format: "${emailTrimmed}"` });
+            continue;
+          }
+          profileData.email = emailTrimmed;
+        }
+
+        // Height sanitization
+        const heightCol = importMapping['height'];
+        if (heightCol && row[heightCol] !== undefined && row[heightCol] !== null && row[heightCol].toString().trim() !== '') {
+          const rawHeight = row[heightCol].toString().trim();
+          const numbersOnly = rawHeight.match(/\d+(?:\.\d+)?/);
+          if (!numbersOnly) {
+            failedCount++;
+            errors.push({ row: i + 1, reason: `Invalid height format: "${rawHeight}"` });
+            continue;
+          }
+          profileData.height = numbersOnly[0];
         }
 
         const stringFields = [
-          'email',
           'locationOfResidence',
           'universityFieldOfStudy',
           'currentJob',
@@ -548,10 +663,7 @@ export default function ImportData({ type = 'Lead', isOpen: controlledIsOpen, on
           'smokeOrDrink',
           'facebookLink',
           'timestamp',
-          'areYouGucian',
-          'gucId',
           'recentPhoto',
-          'height',
           'believeDutyToProvide',
           'areOkayWithWifeWorking',
           'currentFinancialStatus',

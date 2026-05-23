@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useAppContext } from './context';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -35,6 +35,166 @@ import {
 } from 'lucide-react';
 import { MatchStatus, Match, Client } from './types';
 import { ConfirmDialog } from './components/ConfirmDialog';
+
+interface SecureEphemeralImageProps {
+  src: string;
+}
+
+function SecureEphemeralImage({ src }: SecureEphemeralImageProps) {
+  const [hasConsent, setHasConsent] = useState(false);
+  const [timeLeft, setTimeLeft] = useState(5.0);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const stopReveal = () => {
+    setHasConsent(false);
+    setTimeLeft(5.0);
+    if (timerRef.current) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    if (intervalRef.current) {
+      clearInterval(intervalRef.current);
+      intervalRef.current = null;
+    }
+  };
+
+  const startReveal = (e: React.SyntheticEvent) => {
+    e.preventDefault();
+    setHasConsent(true);
+    setTimeLeft(5.0);
+
+    if (timerRef.current) clearTimeout(timerRef.current);
+    if (intervalRef.current) clearInterval(intervalRef.current);
+
+    timerRef.current = setTimeout(() => {
+      stopReveal();
+    }, 5000);
+
+    intervalRef.current = setInterval(() => {
+      setTimeLeft((prev) => {
+        if (prev <= 0.1) {
+          clearInterval(intervalRef.current!);
+          return 0;
+        }
+        return Number((prev - 0.1).toFixed(1));
+      });
+    }, 100);
+  };
+
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+      if (intervalRef.current) clearInterval(intervalRef.current);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!hasConsent) return;
+
+    const handleFocusLoss = () => {
+      stopReveal();
+    };
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (
+        e.key === 'PrintScreen' ||
+        (e.metaKey && e.shiftKey && (e.key === '3' || e.key === '4')) ||
+        (e.metaKey && e.key === 's' && e.shiftKey) ||
+        (e.ctrlKey && e.key === 'p')
+      ) {
+        stopReveal();
+      }
+    };
+
+    window.addEventListener('blur', handleFocusLoss);
+    document.addEventListener('visibilitychange', handleFocusLoss);
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      window.removeEventListener('blur', handleFocusLoss);
+      document.removeEventListener('visibilitychange', handleFocusLoss);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [hasConsent]);
+
+  return (
+    <div className="relative flex flex-col items-center justify-center bg-zinc-950/60 border border-white/10 rounded-2xl w-full max-w-[220px] h-64 overflow-hidden select-none">
+      {hasConsent ? (
+        <div 
+          className="relative w-full h-full cursor-none active:cursor-none"
+          onPointerUp={stopReveal}
+          onPointerLeave={stopReveal}
+          onPointerCancel={stopReveal}
+        >
+          <img 
+            src={src} 
+            alt="Match partner profile photo" 
+            className="w-full h-full object-cover select-none pointer-events-none"
+            draggable={false}
+            onContextMenu={(e) => e.preventDefault()}
+            onDragStart={(e) => e.preventDefault()}
+            style={{
+              pointerEvents: 'none',
+              userSelect: 'none',
+              WebkitUserDrag: 'none'
+            }}
+          />
+          <div className="absolute inset-0 bg-gradient-to-t from-zinc-950 via-transparent to-zinc-950/80 pointer-events-none" />
+          
+          <div className="absolute top-2.5 left-2.5 right-2.5 flex justify-between items-center text-[9px] uppercase tracking-widest text-pink-400 font-bold bg-black/60 backdrop-blur-md px-2.5 py-1.5 rounded-xl border border-white/15 pointer-events-none shadow-lg animate-pulse">
+            <span className="flex items-center gap-1.5">
+              <Shield className="h-3 w-3 text-pink-500 fill-pink-500/25" /> Secure View
+            </span>
+            <span className="text-zinc-300 font-mono">{timeLeft.toFixed(1)}s</span>
+          </div>
+
+          <div className="absolute bottom-3 left-3 right-3 pointer-events-none space-y-1.5">
+            <div className="h-1 w-full bg-white/15 rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-gradient-to-r from-pink-500 to-purple-500 transition-all duration-100 ease-linear rounded-full" 
+                style={{ width: `${(timeLeft / 5) * 100}%` }}
+              />
+            </div>
+            <p className="text-[8px] text-zinc-400 font-medium tracking-widest text-center uppercase animate-pulse">Release cursor to lock</p>
+          </div>
+        </div>
+      ) : (
+        <div 
+          className="w-full h-full flex flex-col justify-center items-center text-center p-5 text-zinc-500 space-y-3 cursor-pointer group hover:bg-zinc-950/20 active:bg-zinc-950/40 transition-all select-none touch-none"
+          onPointerDown={startReveal}
+        >
+          <div className="p-3 bg-gradient-to-br from-zinc-900 to-zinc-950 rounded-2xl border border-white/5 text-zinc-400 shadow-inner group-hover:scale-105 group-hover:border-pink-500/25 transition-all duration-300">
+            <Lock className="h-6 w-6 text-pink-500/60 animate-pulse group-hover:text-pink-500" />
+          </div>
+          <div className="space-y-1">
+            <p className="text-xs font-bold text-zinc-200 uppercase tracking-widest group-hover:text-pink-400 transition-colors">Press & Hold to Reveal</p>
+            <p className="text-[9px] text-zinc-500 leading-relaxed px-1">
+              Swap completes dynamically in secure memory. Screenshot block and 5s ephemeral window active.
+            </p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function convertGoogleDriveLink(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+
+  const fileDMatch = trimmed.match(/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]+)/);
+  if (fileDMatch && fileDMatch[1]) {
+    return `https://lh3.googleusercontent.com/d/${fileDMatch[1]}`;
+  }
+
+  const idMatch = trimmed.match(/drive\.google\.com\/.*[?&]id=([a-zA-Z0-9_-]+)/);
+  if (idMatch && idMatch[1]) {
+    return `https://lh3.googleusercontent.com/d/${idMatch[1]}`;
+  }
+
+  return trimmed;
+}
 
 export default function Portal() {
   const { 
@@ -169,7 +329,7 @@ export default function Portal() {
         height: signUpData.height,
         locationOfResidence: signUpData.locationOfResidence,
         facebookLink: signUpData.facebookLink,
-        recentPhoto: signUpData.recentPhoto.trim(),
+        recentPhoto: convertGoogleDriveLink(signUpData.recentPhoto),
         areYouGucian: signUpData.areYouGucian,
         gucId: signUpData.areYouGucian === 'Yes' ? signUpData.gucId.trim() : '',
         universityFieldOfStudy: signUpData.universityFieldOfStudy,
@@ -479,7 +639,7 @@ export default function Portal() {
     setIsLoading(true);
     try {
       await updateClient(activeCandidate.id, {
-        recentPhoto: newPhotoUrl.trim()
+        recentPhoto: convertGoogleDriveLink(newPhotoUrl)
       });
       setShowPhotoUpload(false);
       setNewPhotoUrl('');
@@ -1344,16 +1504,7 @@ export default function Portal() {
                     {/* Photo Display depending on stage */}
                     <div className="flex justify-center border-b border-white/5 pb-6">
                       {maskedPartner?.recentPhoto ? (
-                        <div className="relative group rounded-2xl overflow-hidden border border-white/15 shadow-2xl w-full max-w-[220px] h-64 bg-zinc-950 flex items-center justify-center transition-all hover:scale-[1.02]">
-                          <img 
-                            src={maskedPartner.recentPhoto} 
-                            alt="Match partner profile photo" 
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent flex items-end p-4">
-                            <p className="text-[10px] font-bold uppercase tracking-widest text-pink-400">Swapped Profile Photo</p>
-                          </div>
-                        </div>
+                        <SecureEphemeralImage src={convertGoogleDriveLink(maskedPartner.recentPhoto)} />
                       ) : (
                         <div className="rounded-2xl border-2 border-dashed border-zinc-800 bg-zinc-950/30 w-full max-w-[220px] h-64 flex flex-col justify-center items-center text-center p-5 text-zinc-500 space-y-3 backdrop-blur-md">
                           <div className="p-3 bg-zinc-900 rounded-2xl border border-white/5 text-zinc-400 shadow-inner">

@@ -58,7 +58,9 @@ export default function Clients() {
     users, 
     isManagerOrAdmin, 
     addInteraction, 
-    addComment 
+    addComment,
+    matches,
+    matchMeetings
   } = useAppContext();
 
   // Selected tab: 'gentlemen' or 'ladies'
@@ -338,6 +340,12 @@ export default function Clients() {
     const dispEmail = isRevealed ? rawProf.email : maskEmail(candidate.email);
     const dispFB = isRevealed ? rawProf.facebookLink : maskFacebook(candidate.facebookLink);
     const comments = candidate.comments || [];
+    const candidateMatches = matches.filter(
+      (m: any) => m.maleId === candidate.id || m.femaleId === candidate.id
+    );
+    const candidateMeetings = matchMeetings.filter(
+      (mm: any) => mm.clientId === candidate.id
+    );
 
     return (
       <DialogContent className="w-[95vw] max-w-[1000px] sm:max-w-[90vw] md:max-w-[1000px] max-h-[90vh] overflow-hidden flex flex-col p-0 border border-white/10 bg-zinc-900/90 backdrop-blur-xl text-white shadow-2xl rounded-2xl shadow-black/80">
@@ -453,6 +461,60 @@ export default function Clients() {
                     <div className="flex justify-between py-1">
                       <span className="text-zinc-500">Must Have Qualities:</span>
                       <span className="font-semibold text-white truncate max-w-[120px]">{candidate.qualitiesDescriptionPartnerPreferences || 'None set'}</span>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Pairings & Date History Bento Card */}
+              <Card className="bg-zinc-900/50 border-white/5 p-5 rounded-xl space-y-4">
+                <h4 className="text-xs font-black uppercase text-pink-400 tracking-wider flex items-center gap-2 border-b border-white/5 pb-2">
+                  <Heart className="h-4 w-4 fill-pink-500/20" /> Active Pairings & Scheduled Dates
+                </h4>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {/* Matches Section */}
+                  <div className="space-y-2">
+                    <h5 className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Match Proposals ({candidateMatches.length})</h5>
+                    <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1 no-scrollbar">
+                      {candidateMatches.length === 0 ? (
+                        <p className="text-[10px] text-zinc-650 italic py-2">No matchmaking proposals initiated yet.</p>
+                      ) : (
+                        candidateMatches.map((m: any) => {
+                          const isMale = m.maleId === candidate.id;
+                          const partnerCode = isMale ? m.ladyCode : m.gentlemanCode;
+                          const partnerName = isMale ? m.femaleName : m.maleName;
+                          return (
+                            <div key={m.id} className="p-2.5 rounded-lg bg-zinc-950/40 border border-white/5 text-[11px] space-y-1">
+                              <div className="flex justify-between items-center">
+                                <span className="font-bold text-zinc-200">Partner: {partnerCode} ({partnerName})</span>
+                                <Badge className="text-[8px] bg-pink-500/10 text-pink-450 border border-pink-500/10 px-1.5 py-0">{m.status}</Badge>
+                              </div>
+                              {m.notes && <p className="text-[10px] text-zinc-500 italic truncate">"{m.notes}"</p>}
+                            </div>
+                          );
+                        })
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Dates Section */}
+                  <div className="space-y-2">
+                    <h5 className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Confirmed Dates & Consults ({candidateMeetings.length})</h5>
+                    <div className="space-y-2 max-h-[140px] overflow-y-auto pr-1 no-scrollbar">
+                      {candidateMeetings.length === 0 ? (
+                        <p className="text-[10px] text-zinc-650 italic py-2">No dates or consultations scheduled yet.</p>
+                      ) : (
+                        candidateMeetings.map((mm: any) => (
+                          <div key={mm.id} className="p-2 rounded-lg bg-zinc-950/40 border border-white/5 text-[11px] flex justify-between items-center">
+                            <div>
+                              <p className="font-bold text-zinc-200">{mm.branch} Venue</p>
+                              <p className="text-[9px] text-zinc-500">Scheduled by Admin</p>
+                            </div>
+                            <span className="font-mono font-bold text-pink-450 text-[10px]">{new Date(mm.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
                 </div>
