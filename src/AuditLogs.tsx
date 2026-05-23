@@ -56,7 +56,7 @@ export default function AuditLogs() {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
           <h2 className="text-2xl font-bold tracking-tight text-foreground">System History</h2>
-          <p className="text-muted-foreground">Track all activities, changes, and attendance across branches.</p>
+          <p className="text-muted-foreground">Track all activities, changes, and date check-ins across regions.</p>
         </div>
       </div>
 
@@ -142,7 +142,10 @@ export default function AuditLogs() {
                           {getEntityBadge(log.entityType)}
                         </TableCell>
                         <TableCell className="text-sm font-medium">
-                          {log.details}
+                          {log.details
+                            .replace(/attendance/gi, 'consultation')
+                            .replace(/members/gi, 'candidates')
+                            .replace(/member/gi, 'candidate')}
                         </TableCell>
                         <TableCell>
                           {log.branch ? (

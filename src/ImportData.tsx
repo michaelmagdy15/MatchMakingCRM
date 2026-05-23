@@ -124,7 +124,7 @@ export default function ImportData({ type = 'Lead' }: ImportDataProps) {
     
     const newMapping: Record<string, string> = {};
     const fieldAliases: Record<string, string[]> = {
-      fullName: ['full name', 'name', 'fullname', 'client', 'customer', 'member', 'lead', 'اسم', 'الاسم'],
+      fullName: ['full name', 'name', 'fullname', 'client', 'customer', 'candidate', 'profile', 'member', 'lead', 'اسم', 'الاسم'],
       phoneNumber: ['phone number', 'phone', 'mobile', 'number', 'tel', 'contact', 'whatsapp', 'رقم', 'تليفون'],
       gender: ['gender', 'sex', 'النوع', 'الجنس'],
       email: ['email', 'e-mail', 'البريد', 'الايميل'],
@@ -211,7 +211,7 @@ export default function ImportData({ type = 'Lead' }: ImportDataProps) {
           const parsedHeaders = results.meta.fields || [];
           const newMapping: Record<string, string> = {};
           const fieldAliases: Record<string, string[]> = {
-            fullName: ['full name', 'name', 'fullname', 'client', 'customer', 'member', 'lead', 'اسم', 'الاسم'],
+            fullName: ['full name', 'name', 'fullname', 'client', 'customer', 'candidate', 'profile', 'member', 'lead', 'اسم', 'الاسم'],
             phoneNumber: ['phone number', 'phone', 'mobile', 'number', 'tel', 'contact', 'whatsapp', 'رقم', 'تليفون'],
             gender: ['gender', 'sex', 'النوع', 'الجنس'],
             email: ['email', 'e-mail', 'البريد', 'الايميل'],
@@ -482,13 +482,13 @@ export default function ImportData({ type = 'Lead' }: ImportDataProps) {
         render={
           <Button variant="outline" size="sm">
             <FileSpreadsheet className="mr-2 h-4 w-4" />
-            Import {type}s
+            Import {type === 'Active' ? 'Active Candidates' : 'Lead Candidates'}
           </Button>
         }
       />
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>Import {type}s from CSV / Google Sheets</DialogTitle>
+          <DialogTitle>Import {type === 'Active' ? 'Active Candidates' : 'Lead Candidates'} from CSV / Google Sheets</DialogTitle>
         </DialogHeader>
 
         {step === 'upload' && (
@@ -497,7 +497,7 @@ export default function ImportData({ type = 'Lead' }: ImportDataProps) {
               <Upload className="h-12 w-12 text-muted-foreground" />
               <div className="text-center">
                 <p className="font-medium">Upload your Matchmaking CSV file</p>
-                <p className="text-sm text-muted-foreground">Select a local .csv file</p>
+                <p className="text-sm text-muted-foreground">Select a local .csv file containing candidate profiles</p>
               </div>
               <input 
                 type="file" 
@@ -567,7 +567,7 @@ export default function ImportData({ type = 'Lead' }: ImportDataProps) {
 
         {step === 'map' && (
           <div className="space-y-4 py-4">
-            <p className="text-sm text-muted-foreground">Map CSV columns to the Matchmaking fields:</p>
+            <p className="text-sm text-muted-foreground">Map CSV columns to matchmaking fields:</p>
             <ScrollArea className="h-[300px] w-full rounded-md border p-4 bg-muted/20">
               <div className="grid gap-4">
                 {fields.map(field => (
@@ -623,8 +623,8 @@ export default function ImportData({ type = 'Lead' }: ImportDataProps) {
             <div className="text-center">
               <p className="font-medium text-xl">Import Complete!</p>
               <p className="text-sm text-muted-foreground">
-                Successfully imported {importStats.success} matchmaking records.
-                {importStats.failed > 0 && ` Failed to import ${importStats.failed} records.`}
+                Successfully imported {importStats.success} matchmaking profiles.
+                {importStats.failed > 0 && ` Failed to import ${importStats.failed} profiles.`}
               </p>
             </div>
             

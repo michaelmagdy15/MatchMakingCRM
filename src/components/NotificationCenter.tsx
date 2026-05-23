@@ -1,15 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useAppContext } from '../context';
 import { Button } from '@/components/ui/button';
-import { Bell, AlertTriangle, Gift, CheckSquare, Clock, User as UserIcon, X, Check, Heart, Image as ImageIcon, Sparkles } from 'lucide-react';
+import { Bell, AlertTriangle, Gift, CheckSquare, Clock, User as UserIcon, X, Check, Heart, Image as ImageIcon, Sparkles, AlertCircle } from 'lucide-react';
 import { differenceInDays, isSameDay, isSameMonth, parseISO, isToday, isBefore, isAfter, startOfDay } from 'date-fns';
 
 export type NotificationType = 
   | 'lead_stale' 
-  | 'member_expiring' 
+  | 'incomplete_profile' 
   | 'birthday' 
   | 'task_due'
   | 'match_stalled'
+  | 'stale_proposed_match'
   | 'mutual_text_approved'
   | 'mutual_photo_approved'
   | 'match_success';
@@ -122,6 +123,26 @@ export function NotificationCenter() {
           }
         }
       }
+
+      // Incomplete Profile Info Alert
+      if (client.status === 'Approved' || client.status === 'Active' || client.status === 'Pending Review') {
+        const missingFields = [];
+        if (!client.selfIntroduction || client.selfIntroduction.trim().length < 10) missingFields.push('self introduction');
+        if (!client.partnerPreferences || client.partnerPreferences.trim().length < 10) missingFields.push('partner preferences');
+        if (!client.phone && !client.phoneNumber) missingFields.push('phone number');
+
+        if (missingFields.length > 0) {
+          generated.push({
+            id: `incomplete_profile_${client.id}`,
+            type: 'incomplete_profile',
+            title: 'Uncompleted Profile Info',
+            description: `${client.name} (Code: ${client.code || 'N/A'}) has incomplete: ${missingFields.join(', ')}.`,
+            date: parseISO(client.createdAt || new Date().toISOString()),
+            recordName: client.name,
+            recordId: client.id
+          });
+        }
+      }
     });
 
     // 2. Match Progress & Stalling Notifications
@@ -135,9 +156,9 @@ export function NotificationCenter() {
       if (daysSinceUpdate >= 2 && match.status !== 'MATCH_ACTIVE' && match.status !== 'PENDING_FEEDBACK') {
         generated.push({
           id: `match_stalled_${match.id}_${match.updatedAt}`,
-          type: 'match_stalled',
-          title: 'Stalled Match Proposal',
-          description: `Match between ${match.gentlemanCode} and ${match.ladyCode} is pending for ${daysSinceUpdate} days.`,
+          type: 'stale_proposed_match',
+          title: 'Stale Proposed Match',
+          description: `Match between ${match.gentlemanCode} and ${match.ladyCode} is stale (no updates in ${daysSinceUpdate} days).`,
           date: lastUpdate,
           recordName: match.gentlemanCode || 'Gentleman',
           recordId: match.id
@@ -223,7 +244,9 @@ export function NotificationCenter() {
       case 'birthday': return <Gift className="h-4 w-4 text-pink-500" />;
       case 'lead_stale': return <Clock className="h-4 w-4 text-amber-500" />;
       case 'task_due': return <CheckSquare className="h-4 w-4 text-blue-500" />;
-      case 'match_stalled': return <AlertTriangle className="h-4 w-4 text-amber-500" />;
+      case 'match_stalled':
+      case 'stale_proposed_match': return <AlertTriangle className="h-4 w-4 text-amber-500" />;
+      case 'incomplete_profile': return <AlertCircle className="h-4 w-4 text-yellow-500" />;
       case 'mutual_text_approved': return <CheckSquare className="h-4 w-4 text-indigo-400" />;
       case 'mutual_photo_approved': return <ImageIcon className="h-4 w-4 text-pink-400" />;
       case 'match_success': return <Heart className="h-4 w-4 text-emerald-400 fill-emerald-500/20 animate-pulse" />;

@@ -11,7 +11,7 @@ interface ConversionFunnelProps {
 
 const STAGES: { stage: LeadStage; label: string; color: string; icon: any }[] = [
   { stage: 'New', label: 'New Leads', color: '#6366f1', icon: Users },
-  { stage: 'Trial', label: 'Consultation Scheduled', color: '#8b5cf6', icon: Calendar },
+  { stage: 'Consultation Scheduled', label: 'Consultation Scheduled', color: '#8b5cf6', icon: Calendar },
   { stage: 'Follow Up', label: 'Follow Up', color: '#a855f7', icon: Target },
   { stage: 'Converted', label: 'Converted', color: '#10b981', icon: CheckCircle2 },
   { stage: 'Lost', label: 'Lost', color: '#ef4444', icon: XCircle },
@@ -38,19 +38,19 @@ const ConversionFunnel: React.FC<ConversionFunnelProps> = ({ selectedRepId, sele
 
     // For a traditional funnel, we assume people move through stages.
     // However, since we only have current stage, we'll just show the breakdown.
-    // If the user wants a progressive funnel (where Converted counts as having been Trial), 
+    // If the user wants a progressive funnel (where Converted counts as having been Consultation Scheduled), 
     // we would sum them up. Let's do a progressive sum for a better visual funnel, 
     // BUT 'Lost' is separate.
     
     // Progressive counts: 
-    // New = New + Trial + FollowUp + Converted
-    // Trial = Trial + FollowUp + Converted
+    // New = New + Consultation Scheduled + FollowUp + Converted
+    // Consultation Scheduled = Consultation Scheduled + FollowUp + Converted
     // FollowUp = FollowUp + Converted
     // Converted = Converted
     
     const progressiveCounts = {
-      'New': counts['New'] + counts['Trial'] + counts['Follow Up'] + counts['Converted'],
-      'Trial': counts['Trial'] + counts['Follow Up'] + counts['Converted'],
+      'New': counts['New'] + counts['Consultation Scheduled'] + counts['Follow Up'] + counts['Converted'],
+      'Consultation Scheduled': counts['Consultation Scheduled'] + counts['Follow Up'] + counts['Converted'],
       'Follow Up': counts['Follow Up'] + counts['Converted'],
       'Converted': counts['Converted'],
       'Lost': counts['Lost']

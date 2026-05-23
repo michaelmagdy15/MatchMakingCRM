@@ -65,7 +65,7 @@ export const mockClients: Client[] = [
         id: 'int1',
         date: formatISO(subDays(now, 10)),
         type: 'Visit',
-        outcome: 'Scheduled Trial',
+        outcome: 'Scheduled Consultation',
         notes: 'In-office interview finished. All criteria verified.',
         author: 'Sarah'
       }

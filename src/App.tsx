@@ -172,7 +172,7 @@ function AppContent() {
               {(currentUser.role === 'manager' || currentUser.role === 'rep' || currentUser.role === 'admin' || currentUser.role === 'super_admin' || currentUser.role === 'crm_admin') && (
                 <TabsTrigger value="leads" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 sm:px-4 text-xs sm:text-sm">
                   <UserPlus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
-                  Dating Leads
+                  Matchees Review
                 </TabsTrigger>
               )}
               

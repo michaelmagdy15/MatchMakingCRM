@@ -1,4 +1,3 @@
-import { QRCodeSVG } from 'qrcode.react';
 import React, { useState, useDeferredValue } from 'react';
 import { useAppContext } from './context';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -68,56 +67,6 @@ export default function Leads() {
   const [isConvertDialogOpen, setIsConvertDialogOpen] = useState(false);
   const [leadToConvert, setLeadToConvert] = useState<Client | null>(null);
 
-  const getQRCodeAsBlob = async (memberId: string): Promise<Blob> => {
-    return new Promise((resolve, reject) => {
-      const svg = document.querySelector(`[data-qr-id="${memberId}"]`);
-      if (!svg) {
-        reject(new Error('QR Code SVG not found'));
-        return;
-      }
-      const svgData = new XMLSerializer().serializeToString(svg);
-      const canvas = document.createElement('canvas');
-      const ctx = canvas.getContext('2d');
-      const img = new Image();
-      img.onload = () => {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx?.drawImage(img, 0, 0);
-        canvas.toBlob((blob) => {
-          if (blob) resolve(blob);
-          else reject(new Error('Failed to create blob'));
-        }, 'image/png');
-      };
-      img.src = 'data:image/svg+xml;base64,' + btoa(svgData);
-    });
-  };
-
-  const downloadQRCode = async (memberId: string, name: string) => {
-    try {
-      const blob = await getQRCodeAsBlob(memberId);
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `QR_${name.replace(/\s+/g, '_')}_${memberId}.png`;
-      link.click();
-      URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Error downloading QR code:', error);
-      alert('Failed to download QR code');
-    }
-  };
-
-  const copyQRCodeToClipboard = async (memberId: string) => {
-    try {
-      const blob = await getQRCodeAsBlob(memberId);
-      const item = new ClipboardItem({ 'image/png': blob });
-      await navigator.clipboard.write([item]);
-      alert('QR code copied to clipboard!');
-    } catch (error) {
-      console.error('Error copying QR code:', error);
-      alert('Failed to copy QR code to clipboard');
-    }
-  };
 
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
@@ -151,7 +100,7 @@ export default function Leads() {
 
     // Stage
     switch (lead.stage) {
-      case 'Trial': score += 10; break;
+      case 'Consultation Scheduled': score += 10; break;
       case 'Follow Up': score += 5; break;
       case 'New': score += 0; break;
     }
@@ -176,7 +125,7 @@ export default function Leads() {
       case 'instagram': filtered = filtered.filter(l => l.source === 'Instagram'); break;
       case 'whatsapp': filtered = filtered.filter(l => l.source === 'WhatsApp'); break;
       case 'walkin': filtered = filtered.filter(l => l.source === 'Walk-in'); break;
-      case 'trials': filtered = filtered.filter(l => l.stage === 'Trial'); break;
+      case 'consultations': filtered = filtered.filter(l => l.stage === 'Consultation Scheduled'); break;
       case 'followup': filtered = filtered.filter(l => l.stage === 'Follow Up'); break;
     }
 
@@ -589,7 +538,13 @@ export default function Leads() {
                             <MessageSquare className="h-4 w-4 mr-2" />
                             Comments
                           </TabsTrigger>
-                          {/* Obsolete QR Code check-in tab for matchmaking hid */}
+                          <TabsTrigger 
+                            value="profilecard" 
+                            className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 font-semibold tracking-wider uppercase text-xs text-muted-foreground data-[state=active]:text-primary"
+                          >
+                            <QrCode className="h-4 w-4 mr-2" />
+                            Profile Code Card
+                          </TabsTrigger>
                         </TabsList>
 
                         <TabsContent value="information" className="mt-0">
@@ -649,7 +604,7 @@ export default function Leads() {
                                     </SelectTrigger>
                                     <SelectContent>
                                       <SelectItem value="New">New</SelectItem>
-                                      <SelectItem value="Trial">Interview / Consultation</SelectItem>
+                                      <SelectItem value="Consultation Scheduled">Interview / Consultation</SelectItem>
                                       <SelectItem value="Follow Up">Follow Up</SelectItem>
                                       <SelectItem value="Converted">Converted</SelectItem>
                                       <SelectItem value="Lost">Lost</SelectItem>
@@ -686,12 +641,12 @@ export default function Leads() {
                                     <SelectValue placeholder="Select loss category" />
                                   </SelectTrigger>
                                   <SelectContent>
-                                    <SelectItem value="Out of area zone">Location mismatch</SelectItem>
-                                    <SelectItem value="Social class">Social status mismatch</SelectItem>
+                                    <SelectItem value="Location mismatch">Location mismatch</SelectItem>
+                                    <SelectItem value="Social status mismatch">Social status mismatch</SelectItem>
                                     <SelectItem value="Price">Fee too high</SelectItem>
                                     <SelectItem value="No answer">No response</SelectItem>
-                                    <SelectItem value="Ladies only">Gender mismatch</SelectItem>
-                                    <SelectItem value="Morning session">Preference mismatch</SelectItem>
+                                    <SelectItem value="Age mismatch">Age mismatch</SelectItem>
+                                    <SelectItem value="Religious denomination mismatch">Religious denomination mismatch</SelectItem>
                                     <SelectItem value="Other">Other</SelectItem>
                                     <SelectItem value="None">None</SelectItem>
                                   </SelectContent>
@@ -793,7 +748,7 @@ export default function Leads() {
                                       <SelectContent>
                                         <SelectItem value="Interested">Interested</SelectItem>
                                         <SelectItem value="Not Answered">Not Answered</SelectItem>
-                                        <SelectItem value="Scheduled Trial">Scheduled Consultation</SelectItem>
+                                        <SelectItem value="Scheduled Consultation">Scheduled Consultation</SelectItem>
                                         <SelectItem value="Rejected">Rejected</SelectItem>
                                         <SelectItem value="Other">Other</SelectItem>
                                       </SelectContent>
@@ -900,33 +855,52 @@ export default function Leads() {
                           </div>
                         </TabsContent>
                         
-                        <TabsContent value="qrcode" className="mt-0 space-y-8">
+                        <TabsContent value="profilecard" className="mt-0 space-y-8">
                            <div className="flex flex-col items-center justify-center p-12 bg-muted/30 rounded-[32px] border border-white/5">
                              <div className="text-center mb-8">
-                               <h3 className="text-2xl font-black mb-2">Member QR Code</h3>
-                               <p className="text-muted-foreground">Scan for quick check-ins and member access.</p>
+                               <h3 className="text-2xl font-black mb-2">Candidate Profile Card</h3>
+                               <p className="text-muted-foreground">Unique identifier for matchmaking verification.</p>
                              </div>
                              
-                             <div className="p-8 bg-white rounded-3xl shadow-2xl mb-8 transform transition-transform hover:scale-105" id={`qr-code-${lead.id}`}>
-                               <QRCodeSVG value={lead.memberId || lead.id} size={250} level="H" includeMargin={true} data-qr-id={lead.memberId || lead.id} />
-                               <div className="text-center mt-4 text-black font-extrabold pb-2">#{lead.memberId || 'PENDING ID'}</div>
+                             <div className="w-[320px] bg-gradient-to-br from-primary to-primary-foreground/30 p-6 rounded-3xl shadow-2xl text-white mb-8 border border-white/20 transform transition-transform hover:scale-105">
+                               <div className="flex justify-between items-center mb-6">
+                                 <span className="text-xs uppercase tracking-widest font-black opacity-80">Matchmaking CRM</span>
+                                 <Badge className="bg-white/20 text-white hover:bg-white/30 border-none font-bold">
+                                   {lead.gender === 'Male' ? 'Gentleman' : lead.gender === 'Female' ? 'Lady' : 'Candidate'}
+                                 </Badge>
+                               </div>
+                               <div className="space-y-4 my-8 text-center">
+                                 <div className="text-sm font-bold opacity-80">Candidate Code</div>
+                                 <div className="text-5xl font-extrabold tracking-wider filter drop-shadow">
+                                   {lead.code || lead.memberId || 'N/A'}
+                                 </div>
+                               </div>
+                               <div className="border-t border-white/10 pt-4 flex justify-between items-center">
+                                 <div>
+                                   <div className="text-[10px] uppercase tracking-widest opacity-60">Full Name</div>
+                                   <div className="text-sm font-bold truncate max-w-[180px]">{lead.name}</div>
+                                 </div>
+                                 <div className="text-right">
+                                   <div className="text-[10px] uppercase tracking-widest opacity-60">Region</div>
+                                   <div className="text-xs font-bold">{lead.branch || 'N/A'}</div>
+                                 </div>
+                               </div>
                              </div>
                              
-                             <div className="flex flex-wrap justify-center gap-4">
+                             <div className="flex justify-center">
                                <Button 
-                                 onClick={() => downloadQRCode(lead.memberId || lead.id, lead.name)}
+                                 onClick={async () => {
+                                   try {
+                                     await navigator.clipboard.writeText(lead.code || lead.memberId || lead.id);
+                                     alert('Candidate code copied to clipboard!');
+                                   } catch (err) {
+                                     alert('Failed to copy code');
+                                   }
+                                 }}
                                  className="font-black uppercase tracking-widest px-8 py-6 rounded-2xl shadow-lg border-2 border-primary/20 hover:bg-primary"
                                >
-                                 <Download className="mr-3 h-5 w-5" />
-                                 Download
-                               </Button>
-                               <Button 
-                                 onClick={() => copyQRCodeToClipboard(lead.memberId || lead.id)}
-                                 variant="outline"
-                                 className="font-black uppercase tracking-widest px-8 py-6 rounded-2xl shadow-lg border-2 border-primary/30 hover:bg-primary/5 hover:text-primary"
-                               >
                                  <Copy className="mr-3 h-5 w-5" />
-                                 Copy for Sharing
+                                 Copy Profile Code
                                </Button>
                              </div>
                            </div>
@@ -1087,7 +1061,7 @@ export default function Leads() {
                 <SelectItem value="All">All Stages</SelectItem>
                 <SelectItem value="New">New</SelectItem>
                 <SelectItem value="Follow Up">Follow Up</SelectItem>
-                <SelectItem value="Trial">Interview / Consultation</SelectItem>
+                <SelectItem value="Consultation Scheduled">Interview / Consultation</SelectItem>
                 <SelectItem value="Converted">Converted</SelectItem>
                 <SelectItem value="Lost">Lost</SelectItem>
               </SelectContent>
@@ -1159,7 +1133,7 @@ export default function Leads() {
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="New">New</SelectItem>
-                  <SelectItem value="Trial">Interview / Consultation</SelectItem>
+                  <SelectItem value="Consultation Scheduled">Interview / Consultation</SelectItem>
                   <SelectItem value="Follow Up">Follow Up</SelectItem>
                   <SelectItem value="Lost">Lost</SelectItem>
                 </SelectContent>
@@ -1238,7 +1212,7 @@ export default function Leads() {
             <TabsTrigger value="instagram" className="px-4 text-xs sm:text-sm">Instagram</TabsTrigger>
             <TabsTrigger value="whatsapp" className="px-4 text-xs sm:text-sm">WhatsApp</TabsTrigger>
             <TabsTrigger value="walkin" className="px-4 text-xs sm:text-sm">Referral</TabsTrigger>
-            <TabsTrigger value="trials" className="px-4 text-xs sm:text-sm">Interview / Consultation</TabsTrigger>
+            <TabsTrigger value="consultations" className="px-4 text-xs sm:text-sm">Interview / Consultation</TabsTrigger>
             <TabsTrigger value="followup" className="px-4 text-xs sm:text-sm">Follow up</TabsTrigger>
           </TabsList>
         </div>

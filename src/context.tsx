@@ -7,14 +7,17 @@ import {
   Payment, 
   SalesTarget, 
   PTPackageRecord, 
+  ActivePairing,
   AuditLog, 
   Task, 
   Package, 
   Coach, 
+  Matchmaker,
   ImportBatch,
   UserSalesTarget,
   BrandingSettings,
   Attendance,
+  MatchMeeting,
   Branch,
   CRMComment,
   InteractionLog,
@@ -35,12 +38,14 @@ interface AppContextType {
   rawProfiles: Client[]; // alias
   salesTarget: SalesTarget;
   payments: Payment[];
+  activePairings: ActivePairing[]; // modernized
   ptPackageRecords: PTPackageRecord[]; // alias for matches
   matches: Match[];
   auditLogs: AuditLog[];
   tasks: Task[];
   packages: Package[];
-  coaches: Coach[];
+  matchmakers: Matchmaker[]; // modernized
+  coaches: Coach[]; // legacy
   importBatches: ImportBatch[];
   userTargets: UserSalesTarget[];
   searchQuery: string;
@@ -59,6 +64,8 @@ interface AppContextType {
   updatePayment: (id: string, updates: Partial<Payment>) => Promise<void>;
   updateSalesTarget: (target: number) => Promise<void>;
   updateUserTarget: (userId: string, month: string, total: number, privateTarget: number, groupTarget: number) => Promise<void>;
+  addActivePairing: (pairing: Omit<ActivePairing, 'id'>) => Promise<void>; // modernized
+  updateActivePairing: (id: string, updates: Partial<ActivePairing>) => Promise<void>; // modernized
   addPTPackageRecord: (session: Omit<PTPackageRecord, 'id'>) => Promise<void>;
   updatePTPackageRecord: (id: string, updates: Partial<PTPackageRecord>) => Promise<void>;
   addMatch: (match: Omit<Match, 'id' | 'createdAt' | 'updatedAt'>) => Promise<void>;
@@ -70,6 +77,9 @@ interface AppContextType {
   addPackage: (pkg: Omit<Package, 'id'>) => Promise<void>;
   updatePackage: (id: string, updates: Partial<Package>) => Promise<void>;
   deletePackage: (id: string) => Promise<void>;
+  addMatchmaker: (matchmaker: Omit<Matchmaker, 'id'>) => Promise<void>; // modernized
+  updateMatchmaker: (id: string, updates: Partial<Matchmaker>) => Promise<void>; // modernized
+  deleteMatchmaker: (id: string) => Promise<void>; // modernized
   addCoach: (coach: Omit<Coach, 'id'>) => Promise<void>;
   updateCoach: (id: string, updates: Partial<Coach>) => Promise<void>;
   deleteCoach: (id: string) => Promise<void>;
@@ -80,6 +90,8 @@ interface AppContextType {
   updateBranding: (branding: Partial<BrandingSettings>) => Promise<void>;
   previewRole: UserRole | null;
   setPreviewRole: (role: UserRole | null) => void;
+  matchMeetings: MatchMeeting[]; // modernized
+  recordMatchMeeting: (clientId: string, branch: Branch) => Promise<void>; // modernized
   attendances: Attendance[];
   recordAttendance: (clientId: string, branch: Branch) => Promise<void>;
   deletePayment: (id: string) => Promise<void>;
@@ -149,7 +161,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [previewRole, setPreviewRole] = useState<UserRole | null>(null);
 
-  // Stubs for Gym-Specific States (keeps compiler happy)
+  // Stubs for CRM-Specific States (keeps compiler happy and adapted for matchmaking)
   const [payments, setPayments] = useState<Payment[]>([]);
   const [packages, setPackages] = useState<Package[]>([
     { id: 'pkg-premium-3m', name: 'PureMatch Premium (3 Months)', price: 5000, sessions: 1, expiryDays: 90, branch: 'ALL', type: 'Other' },
@@ -157,9 +169,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     { id: 'pkg-consult', name: 'Single Match Consultation', price: 1500, sessions: 1, expiryDays: 30, branch: 'ALL', type: 'Other' },
     { id: 'pkg-setup', name: 'Profile Setup & Optimization', price: 800, sessions: 1, expiryDays: 15, branch: 'ALL', type: 'Other' }
   ]);
-  const [coaches, setCoaches] = useState<Coach[]>([]);
+  const [matchmakers, setMatchmakers] = useState<Matchmaker[]>([]);
+  const coaches = matchmakers;
+  const setCoaches = setMatchmakers;
   const [userTargets, setUserTargets] = useState<UserSalesTarget[]>([]);
-  const [attendances, setAttendances] = useState<Attendance[]>([]);
+  const [matchMeetings, setMatchMeetings] = useState<MatchMeeting[]>([]);
+  const attendances = matchMeetings;
+  const setAttendances = setMatchMeetings;
   const [globalSalesTarget, setGlobalSalesTarget] = useState(50000);
   const [branding, setBranding] = useState<BrandingSettings>({
     companyName: 'PureMatch CRM',
@@ -455,10 +471,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const rawProfiles = rawClients;
 
   // Audit Logs Getter
-  const ptPackageRecords = useMemo(() => {
-    return baseMatches as unknown as PTPackageRecord[];
+  const activePairings = useMemo(() => {
+    return baseMatches as unknown as ActivePairing[];
   }, [baseMatches]);
 
+  const ptPackageRecords = activePairings;
   const matches = baseMatches;
 
   // CRUD Operations: PROFILES (adapted from Clients)
@@ -950,7 +967,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     alert('System database wiped successfully.');
   };
 
-  // Blank/Stub implementations for legacy CRM functions (avoids compiler errors)
+  // Adapted implementations for modernized matchmaking functions
   const addPayment = async () => {};
   const updatePayment = async () => {};
   const deletePayment = async () => {};
@@ -958,10 +975,43 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addPackage = async () => {};
   const updatePackage = async () => {};
   const deletePackage = async () => {};
-  const addCoach = async () => {};
-  const updateCoach = async () => {};
-  const deleteCoach = async () => {};
-  const recordAttendance = async () => {};
+  
+  const addMatchmaker = async (matchmaker: Omit<Matchmaker, 'id'>) => {
+    const newId = Math.random().toString(36).substr(2, 9);
+    const newRecord = { ...matchmaker, id: newId };
+    setMatchmakers(prev => [...prev, newRecord]);
+    await addAuditLog('CREATE', 'MATCHMAKER', newId, `Added matchmaker: ${matchmaker.name}`);
+  };
+  const updateMatchmaker = async (id: string, updates: Partial<Matchmaker>) => {
+    setMatchmakers(prev => prev.map(m => m.id === id ? { ...m, ...updates } : m));
+    await addAuditLog('UPDATE', 'MATCHMAKER', id, `Updated matchmaker ID: ${id}`);
+  };
+  const deleteMatchmaker = async (id: string) => {
+    setMatchmakers(prev => prev.filter(m => m.id !== id));
+    await addAuditLog('DELETE', 'MATCHMAKER', id, `Deleted matchmaker ID: ${id}`);
+  };
+
+  // Legacy mappings for Coach
+  const addCoach = addMatchmaker;
+  const updateCoach = updateMatchmaker;
+  const deleteCoach = deleteMatchmaker;
+
+  const recordMatchMeeting = async (clientId: string, branch: Branch) => {
+    const newId = Math.random().toString(36).substr(2, 9);
+    const newMeeting: MatchMeeting = {
+      id: newId,
+      clientId,
+      branch,
+      date: new Date().toISOString(),
+      recordedBy: currentUser?.id || 'admin'
+    };
+    setMatchMeetings(prev => [...prev, newMeeting]);
+    await addAuditLog('CREATE', 'MATCH_MEETING', newId, `Recorded check-in/meeting for profile ID: ${clientId}`);
+  };
+
+  // Legacy mapping for Attendance
+  const recordAttendance = recordMatchMeeting;
+
   const recalculateAllPackages = async () => {};
   const updateSalesTarget = async () => {};
   const updateUserTarget = async (userId: string, month: string, total: number, privateTarget: number, groupTarget: number) => {
@@ -989,8 +1039,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     addAuditLog('UPDATE', 'TARGET', userId, `Updated activity targets for rep ${userId} for ${month}`);
   };
-  const addPTPackageRecord = async () => {};
-  const updatePTPackageRecord = async () => {};
+
+  const addActivePairing = async (pairing: Omit<ActivePairing, 'id'>) => {
+    await addMatch(pairing as any);
+  };
+  const updateActivePairing = async (id: string, updates: Partial<ActivePairing>) => {
+    await updateMatch(id, updates as any);
+  };
+
+  // Legacy mapping for PTPackageRecord
+  const addPTPackageRecord = addActivePairing;
+  const updatePTPackageRecord = updateActivePairing;
   const selfCheckIn = async () => ({ success: false, message: 'Check-in not configured in matchmaking' });
   const mergeDuplicates = async () => {};
   const backfillMemberIds = async () => {};
@@ -1011,11 +1070,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     rawProfiles,
     salesTarget: { targetAmount: 100, currentAmount: 0, privatePackagesSold: 0, groupPackagesSold: 0, privateTarget: 50, groupTarget: 50 },
     payments,
+    activePairings,
     ptPackageRecords,
     matches,
     auditLogs,
     tasks,
     packages,
+    matchmakers,
     coaches,
     importBatches,
     userTargets,
@@ -1035,6 +1096,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updatePayment,
     updateSalesTarget,
     updateUserTarget,
+    addActivePairing,
+    updateActivePairing,
     addPTPackageRecord,
     updatePTPackageRecord,
     addMatch,
@@ -1046,6 +1109,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     addPackage,
     updatePackage,
     deletePackage,
+    addMatchmaker,
+    updateMatchmaker,
+    deleteMatchmaker,
     addCoach,
     updateCoach,
     deleteCoach,
@@ -1056,6 +1122,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     updateBranding,
     previewRole,
     setPreviewRole,
+    matchMeetings,
+    recordMatchMeeting,
     attendances,
     recordAttendance,
     deletePayment,
@@ -1082,11 +1150,13 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     profiles,
     rawProfiles,
     payments,
+    activePairings,
     ptPackageRecords,
     matches,
     auditLogs,
     tasks,
     packages,
+    matchmakers,
     coaches,
     importBatches,
     userTargets,
@@ -1094,6 +1164,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     isAuthReady,
     branding,
     previewRole,
+    matchMeetings,
     attendances,
     canDeletePayments,
     canAccessSettings,

@@ -39,7 +39,8 @@ export default function Portal() {
     updateMatch, 
     updateClient,
     addComment,
-    branding
+    branding,
+    addClient
   } = useAppContext();
 
   // Authentication State
@@ -60,6 +61,146 @@ export default function Portal() {
   const [showPhotoUpload, setShowPhotoUpload] = useState(false);
   const [newPhotoUrl, setNewPhotoUrl] = useState('');
   const [copied, setCopied] = useState<string | null>(null);
+
+  // Candidate Registration State
+  const [isSigningUp, setIsSigningUp] = useState(false);
+  const [signUpStep, setSignUpStep] = useState(1);
+  const [signUpData, setSignUpData] = useState({
+    fullName: '',
+    phoneNumber: '',
+    gender: 'Female',
+    email: '',
+    age: '',
+    height: '',
+    locationOfResidence: '',
+    facebookLink: '',
+    recentPhoto: '',
+    areYouGucian: 'No',
+    gucId: '',
+    universityFieldOfStudy: '',
+    currentJob: '',
+    currentFinancialStatus: '',
+    religion: 'Muslim',
+    religiousDenomination: '',
+    prayRegularly: 'Yes',
+    hijabPreference: '',
+    religiousCommitmentLevel: '',
+    maritalStatus: 'Single',
+    haveChildren: 'No',
+    childrenDetails: '',
+    smokeOrDrink: 'No',
+    selfIntroduction: '',
+    preferredAgeRange: '',
+    preferredReligiousDenomination: '',
+    believeDutyToProvide: '',
+    areOkayWithWifeWorking: '',
+    preferOlderOrYounger: '',
+    openToLongDistance: 'No',
+    willingToRelocate: 'No',
+    partnerPreferences: '',
+  });
+
+  const handleSignUpSubmit = async (e: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!signUpData.fullName.trim() || !signUpData.phoneNumber.trim() || !signUpData.gender) {
+      setErrorMsg('Please fill out all required fields.');
+      return;
+    }
+
+    setIsLoading(true);
+    setErrorMsg('');
+
+    try {
+      const newId = Math.random().toString(36).substr(2, 9);
+      
+      // Auto-compute next sequential code
+      let nextFemaleSuffix = 101;
+      let nextMaleSuffix = 101;
+      
+      rawProfiles.forEach(c => {
+        const codeVal = (c.memberId || c.code || '').toString().trim();
+        if (!codeVal) return;
+
+        const femaleMatch = codeVal.match(/^[lL](\d+)$/);
+        if (femaleMatch) {
+          const num = parseInt(femaleMatch[1], 10);
+          if (num >= nextFemaleSuffix) {
+            nextFemaleSuffix = num + 1;
+          }
+        }
+
+        const maleMatch = codeVal.match(/^[gG](\d+)$/);
+        if (maleMatch) {
+          const num = parseInt(maleMatch[1], 10);
+          if (num >= nextMaleSuffix) {
+            nextMaleSuffix = num + 1;
+          }
+        }
+      });
+
+      const isFemale = signUpData.gender.toLowerCase() === 'female' || signUpData.gender.toLowerCase() === 'lady';
+      const code = isFemale ? `L${nextFemaleSuffix}` : `G${nextMaleSuffix}`;
+      
+      const newCandidate: Client = {
+        id: newId,
+        name: signUpData.fullName.trim(),
+        phone: signUpData.phoneNumber.trim().replace(/[^\d+]/g, ''),
+        fullName: signUpData.fullName.trim(),
+        phoneNumber: signUpData.phoneNumber.trim().replace(/[^\d+]/g, ''),
+        gender: isFemale ? 'Female' : 'Male',
+        memberId: code,
+        code: code,
+        status: 'Pending Review',
+        createdAt: new Date().toISOString(),
+        comments: [],
+        interactions: [],
+        lastContactDate: new Date().toISOString(),
+        
+        email: signUpData.email.trim(),
+        age: signUpData.age ? parseInt(signUpData.age, 10) : undefined,
+        finalAge: signUpData.age ? parseInt(signUpData.age, 10) : undefined,
+        height: signUpData.height,
+        locationOfResidence: signUpData.locationOfResidence,
+        facebookLink: signUpData.facebookLink,
+        recentPhoto: signUpData.recentPhoto.trim(),
+        areYouGucian: signUpData.areYouGucian,
+        gucId: signUpData.areYouGucian === 'Yes' ? signUpData.gucId.trim() : '',
+        universityFieldOfStudy: signUpData.universityFieldOfStudy,
+        currentJob: signUpData.currentJob,
+        currentFinancialStatus: signUpData.currentFinancialStatus,
+        religion: signUpData.religion,
+        religiousDenomination: signUpData.religiousDenomination,
+        prayRegularly: signUpData.prayRegularly,
+        hijabPreference: isFemale ? signUpData.hijabPreference : undefined,
+        religiousCommitmentLevel: signUpData.religiousCommitmentLevel,
+        maritalStatus: signUpData.maritalStatus,
+        haveChildren: signUpData.haveChildren,
+        childrenDetails: signUpData.haveChildren === 'Yes' ? signUpData.childrenDetails : '',
+        smokeOrDrink: signUpData.smokeOrDrink,
+        selfIntroduction: signUpData.selfIntroduction,
+        preferredAgeRange: signUpData.preferredAgeRange,
+        preferredReligiousDenomination: signUpData.preferredReligiousDenomination,
+        believeDutyToProvide: signUpData.believeDutyToProvide,
+        areOkayWithWifeWorking: signUpData.areOkayWithWifeWorking,
+        preferOlderOrYounger: signUpData.preferOlderOrYounger,
+        openToLongDistance: signUpData.openToLongDistance,
+        willingToRelocate: signUpData.willingToRelocate,
+        partnerPreferences: signUpData.partnerPreferences,
+      };
+
+      await addClient(newCandidate);
+      
+      // Auto login newly created client
+      setCandidate(newCandidate);
+      localStorage.setItem('portal_candidate', JSON.stringify(newCandidate));
+      setIsSigningUp(false);
+      setSignUpStep(1);
+    } catch (e: any) {
+      setErrorMsg('Failed to sign up: ' + e.message);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   // Sync candidate profile updates if base state changes
   const activeCandidate = useMemo(() => {
@@ -348,85 +489,623 @@ export default function Portal() {
 
   if (!activeCandidate) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-zinc-950 to-purple-950 flex flex-col justify-center items-center px-4 font-sans text-white">
-        <Card className="w-full max-w-md bg-zinc-900/60 border border-white/10 backdrop-blur-2xl shadow-2xl rounded-3xl p-6 sm:p-8 space-y-6">
-          <div className="text-center space-y-2">
-            <div className="inline-flex items-center justify-center p-3 rounded-full bg-gradient-to-r from-pink-500/20 to-purple-500/20 border border-pink-500/30 mb-2">
-              <Heart className="h-8 w-8 text-pink-500 fill-pink-500 animate-pulse" />
-            </div>
-            <h1 className="text-3xl font-extralight tracking-[0.15em] uppercase text-white font-logo">
-              {branding.companyName || 'PUREMATCH'}
-            </h1>
-            <p className="text-sm text-zinc-400 uppercase tracking-widest">Candidate Secure Portal</p>
-          </div>
-
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-1">
-              <label htmlFor="loginInput" className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Candidate Email or ID Code</label>
-              <div className="relative">
-                <Input 
-                  id="loginInput"
-                  type="text" 
-                  placeholder="e.g. L101 or your email address"
-                  className="bg-zinc-900/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 pl-3 h-11"
-                  value={loginInput}
-                  onChange={(e) => setLoginInput(e.target.value)}
-                  disabled={isLoading}
-                />
+      <div className="min-h-screen bg-gradient-to-br from-indigo-950 via-zinc-950 to-purple-950 flex flex-col justify-center items-center px-4 font-sans text-white py-12">
+        {isSigningUp ? (
+          <Card className="w-full max-w-2xl bg-zinc-900/60 border border-white/10 backdrop-blur-2xl shadow-2xl rounded-3xl p-6 sm:p-8 space-y-6 animate-in fade-in zoom-in-95 duration-300">
+            <div className="text-center space-y-1">
+              <div className="inline-flex items-center justify-center p-2.5 rounded-full bg-gradient-to-r from-pink-500/20 to-purple-500/20 border border-pink-500/30 mb-1">
+                <Heart className="h-6 w-6 text-pink-500 fill-pink-500 animate-pulse" />
               </div>
+              <h2 className="text-2xl font-extralight tracking-[0.1em] uppercase text-white font-logo">
+                Candidate Registration
+              </h2>
+              <p className="text-[10px] text-zinc-400 uppercase tracking-widest font-semibold">
+                Step {signUpStep} of 4: {
+                  signUpStep === 1 ? 'Core Profile Details' :
+                  signUpStep === 2 ? 'Academics & Career' :
+                  signUpStep === 3 ? 'Lifestyle & Religion' :
+                  'Partner Preferences'
+                }
+              </p>
             </div>
 
-            {errorMsg && (
-              <p className="text-xs text-rose-400 bg-rose-950/20 border border-rose-950/30 p-2.5 rounded-lg flex items-center gap-2">
-                <X className="h-4 w-4 shrink-0" /> {errorMsg}
+            {/* Stepper Indicators */}
+            <div className="flex justify-between items-center relative py-2 max-w-md mx-auto">
+              <div className="absolute left-0 right-0 top-1/2 h-0.5 bg-zinc-800 -translate-y-1/2 z-0" />
+              <div className="absolute left-0 top-1/2 h-0.5 bg-gradient-to-r from-pink-500 to-purple-500 -translate-y-1/2 z-0 transition-all duration-300" style={{ width: `${(signUpStep - 1) / 3 * 100}%` }} />
+              
+              {[1, 2, 3, 4].map((stepNum) => (
+                <div 
+                  key={stepNum} 
+                  className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold z-10 transition-all duration-300 ${
+                    signUpStep >= stepNum 
+                      ? 'bg-gradient-to-r from-pink-500 to-purple-500 text-white shadow-lg shadow-pink-500/10' 
+                      : 'bg-zinc-800 text-zinc-500 border border-zinc-700'
+                  }`}
+                >
+                  {stepNum}
+                </div>
+              ))}
+            </div>
+
+            <form onSubmit={(e) => { e.preventDefault(); if (signUpStep === 4) handleSignUpSubmit(e); }} className="space-y-6 pt-2">
+              
+              {/* Step 1: Core Details */}
+              {signUpStep === 1 && (
+                <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Full Name <span className="text-pink-500">*</span></label>
+                      <Input 
+                        type="text" 
+                        placeholder="Your full name"
+                        className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10 pl-3"
+                        value={signUpData.fullName}
+                        onChange={(e) => setSignUpData({...signUpData, fullName: e.target.value})}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Phone / WhatsApp Number <span className="text-pink-500">*</span></label>
+                      <Input 
+                        type="text" 
+                        placeholder="e.g. +20123456789"
+                        className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10 pl-3"
+                        value={signUpData.phoneNumber}
+                        onChange={(e) => setSignUpData({...signUpData, phoneNumber: e.target.value})}
+                        required
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Gender <span className="text-pink-500">*</span></label>
+                      <Select 
+                        value={signUpData.gender} 
+                        onValueChange={(val) => setSignUpData({...signUpData, gender: val})}
+                      >
+                        <SelectTrigger className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10">
+                          <SelectValue placeholder="Select Gender" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-zinc-900 border-zinc-800 text-white">
+                          <SelectItem value="Female">Female (Lady)</SelectItem>
+                          <SelectItem value="Male">Male (Gentleman)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Email Address</label>
+                      <Input 
+                        type="email" 
+                        placeholder="your.email@example.com"
+                        className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10 pl-3"
+                        value={signUpData.email}
+                        onChange={(e) => setSignUpData({...signUpData, email: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Age</label>
+                      <Input 
+                        type="number" 
+                        placeholder="e.g. 25"
+                        className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10 pl-3"
+                        value={signUpData.age}
+                        onChange={(e) => setSignUpData({...signUpData, age: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Height (cm)</label>
+                      <Input 
+                        type="text" 
+                        placeholder="e.g. 170"
+                        className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10 pl-3"
+                        value={signUpData.height}
+                        onChange={(e) => setSignUpData({...signUpData, height: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Location of Residence</label>
+                      <Input 
+                        type="text" 
+                        placeholder="e.g. New Cairo, Egypt"
+                        className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10 pl-3"
+                        value={signUpData.locationOfResidence}
+                        onChange={(e) => setSignUpData({...signUpData, locationOfResidence: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Facebook Link</label>
+                      <Input 
+                        type="url" 
+                        placeholder="https://facebook.com/yourprofile"
+                        className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10 pl-3"
+                        value={signUpData.facebookLink}
+                        onChange={(e) => setSignUpData({...signUpData, facebookLink: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Photo URL</label>
+                      <Input 
+                        type="url" 
+                        placeholder="https://example.com/your-recent-photo.jpg"
+                        className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10 pl-3"
+                        value={signUpData.recentPhoto}
+                        onChange={(e) => setSignUpData({...signUpData, recentPhoto: e.target.value})}
+                      />
+                      <p className="text-[10px] text-zinc-500 leading-normal">Provide a link to a recent photo. Note: Photos are locked and only swapped dynamically after mutual consent in the portal.</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 2: Academics & Career */}
+              {signUpStep === 2 && (
+                <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Are you a GUCian?</label>
+                      <Select 
+                        value={signUpData.areYouGucian} 
+                        onValueChange={(val) => setSignUpData({...signUpData, areYouGucian: val, gucId: val === 'No' ? '' : signUpData.gucId})}
+                      >
+                        <SelectTrigger className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10">
+                          <SelectValue placeholder="Select Yes/No" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-zinc-900 border-zinc-800 text-white">
+                          <SelectItem value="Yes">Yes</SelectItem>
+                          <SelectItem value="No">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {signUpData.areYouGucian === 'Yes' && (
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">GUC ID</label>
+                        <Input 
+                          type="text" 
+                          placeholder="e.g. 43-12345"
+                          className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10 pl-3"
+                          value={signUpData.gucId}
+                          onChange={(e) => setSignUpData({...signUpData, gucId: e.target.value})}
+                        />
+                      </div>
+                    )}
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">University / Field of Study</label>
+                      <Input 
+                        type="text" 
+                        placeholder="e.g. Computer Science, Engineering, Business Administration"
+                        className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10 pl-3"
+                        value={signUpData.universityFieldOfStudy}
+                        onChange={(e) => setSignUpData({...signUpData, universityFieldOfStudy: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Current Job / Profession</label>
+                      <Input 
+                        type="text" 
+                        placeholder="e.g. Software Engineer, Marketing Manager, Business Owner"
+                        className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10 pl-3"
+                        value={signUpData.currentJob}
+                        onChange={(e) => setSignUpData({...signUpData, currentJob: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Current Financial Status / Level</label>
+                      <Input 
+                        type="text" 
+                        placeholder="e.g. Stable, Upper Middle, Comfortable"
+                        className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10 pl-3"
+                        value={signUpData.currentFinancialStatus}
+                        onChange={(e) => setSignUpData({...signUpData, currentFinancialStatus: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 3: Lifestyle & Religion */}
+              {signUpStep === 3 && (
+                <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Religion</label>
+                      <Select 
+                        value={signUpData.religion} 
+                        onValueChange={(val) => setSignUpData({...signUpData, religion: val})}
+                      >
+                        <SelectTrigger className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10">
+                          <SelectValue placeholder="Select Religion" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-zinc-900 border-zinc-800 text-white">
+                          <SelectItem value="Muslim">Muslim</SelectItem>
+                          <SelectItem value="Christian">Christian</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Religious Denomination / Sect</label>
+                      <Input 
+                        type="text" 
+                        placeholder="e.g. Sunni, Coptic Orthodox, Catholic"
+                        className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10 pl-3"
+                        value={signUpData.religiousDenomination}
+                        onChange={(e) => setSignUpData({...signUpData, religiousDenomination: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Pray Regularly?</label>
+                      <Select 
+                        value={signUpData.prayRegularly} 
+                        onValueChange={(val) => setSignUpData({...signUpData, prayRegularly: val})}
+                      >
+                        <SelectTrigger className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10">
+                          <SelectValue placeholder="Select Option" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-zinc-900 border-zinc-800 text-white">
+                          <SelectItem value="Yes">Yes</SelectItem>
+                          <SelectItem value="Sometimes">Sometimes</SelectItem>
+                          <SelectItem value="No">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {signUpData.gender === 'Female' && (
+                      <div className="space-y-1.5">
+                        <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Hijab Preference</label>
+                        <Select 
+                          value={signUpData.hijabPreference} 
+                          onValueChange={(val) => setSignUpData({...signUpData, hijabPreference: val})}
+                        >
+                          <SelectTrigger className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10">
+                            <SelectValue placeholder="Select Hijab Preference" />
+                          </SelectTrigger>
+                          <SelectContent className="bg-zinc-900 border-zinc-800 text-white">
+                            <SelectItem value="Hijab">Hijab</SelectItem>
+                            <SelectItem value="No Hijab">No Hijab</SelectItem>
+                            <SelectItem value="Turband">Turband</SelectItem>
+                            <SelectItem value="Svarf">Svarf</SelectItem>
+                            <SelectItem value="Abaya">Abaya</SelectItem>
+                            <SelectItem value="Other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Religious Commitment Level</label>
+                      <Input 
+                        type="text" 
+                        placeholder="e.g. Moderate, Practicing, Highly religious"
+                        className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10 pl-3"
+                        value={signUpData.religiousCommitmentLevel}
+                        onChange={(e) => setSignUpData({...signUpData, religiousCommitmentLevel: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Marital Status</label>
+                      <Select 
+                        value={signUpData.maritalStatus} 
+                        onValueChange={(val) => setSignUpData({...signUpData, maritalStatus: val})}
+                      >
+                        <SelectTrigger className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10">
+                          <SelectValue placeholder="Select Status" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-zinc-900 border-zinc-800 text-white">
+                          <SelectItem value="Single">Single</SelectItem>
+                          <SelectItem value="Divorced">Divorced</SelectItem>
+                          <SelectItem value="Widowed">Widowed</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Have Children?</label>
+                      <Select 
+                        value={signUpData.haveChildren} 
+                        onValueChange={(val) => setSignUpData({...signUpData, haveChildren: val, childrenDetails: val === 'No' ? '' : signUpData.childrenDetails})}
+                      >
+                        <SelectTrigger className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10">
+                          <SelectValue placeholder="Select" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-zinc-900 border-zinc-800 text-white">
+                          <SelectItem value="Yes">Yes</SelectItem>
+                          <SelectItem value="No">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    {signUpData.haveChildren === 'Yes' && (
+                      <div className="space-y-1.5 sm:col-span-2">
+                        <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Children Details</label>
+                        <Input 
+                          type="text" 
+                          placeholder="e.g. One child (age 4)"
+                          className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10 pl-3"
+                          value={signUpData.childrenDetails}
+                          onChange={(e) => setSignUpData({...signUpData, childrenDetails: e.target.value})}
+                        />
+                      </div>
+                    )}
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Smoke or Drink?</label>
+                      <Select 
+                        value={signUpData.smokeOrDrink} 
+                        onValueChange={(val) => setSignUpData({...signUpData, smokeOrDrink: val})}
+                      >
+                        <SelectTrigger className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10">
+                          <SelectValue placeholder="Select option" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-zinc-900 border-zinc-800 text-white">
+                          <SelectItem value="No">No (Neither)</SelectItem>
+                          <SelectItem value="Smoke only">Smoke only</SelectItem>
+                          <SelectItem value="Drink only">Drink only</SelectItem>
+                          <SelectItem value="Socially">Socially</SelectItem>
+                          <SelectItem value="Yes">Yes (Both)</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Self Introduction / About Me</label>
+                      <textarea 
+                        rows={3}
+                        placeholder="Introduce yourself to potential matches, highlighting your interests, values, and personality..."
+                        className="w-full bg-zinc-950/80 border border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs p-3 focus:outline-none focus:ring-1 focus:ring-pink-500/30"
+                        value={signUpData.selfIntroduction}
+                        onChange={(e) => setSignUpData({...signUpData, selfIntroduction: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Step 4: Partner Preferences */}
+              {signUpStep === 4 && (
+                <div className="space-y-4 animate-in fade-in slide-in-from-right-4 duration-300">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Preferred Age Range</label>
+                      <Input 
+                        type="text" 
+                        placeholder="e.g. 23-28"
+                        className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10 pl-3"
+                        value={signUpData.preferredAgeRange}
+                        onChange={(e) => setSignUpData({...signUpData, preferredAgeRange: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Preferred Sect / Denomination</label>
+                      <Input 
+                        type="text" 
+                        placeholder="e.g. Sunni preferred, Orthodox"
+                        className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10 pl-3"
+                        value={signUpData.preferredReligiousDenomination}
+                        onChange={(e) => setSignUpData({...signUpData, preferredReligiousDenomination: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Open to Long Distance?</label>
+                      <Select 
+                        value={signUpData.openToLongDistance} 
+                        onValueChange={(val) => setSignUpData({...signUpData, openToLongDistance: val})}
+                      >
+                        <SelectTrigger className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10">
+                          <SelectValue placeholder="Select Option" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-zinc-900 border-zinc-800 text-white">
+                          <SelectItem value="Yes">Yes</SelectItem>
+                          <SelectItem value="No">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Willing to Relocate?</label>
+                      <Select 
+                        value={signUpData.willingToRelocate} 
+                        onValueChange={(val) => setSignUpData({...signUpData, willingToRelocate: val})}
+                      >
+                        <SelectTrigger className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10">
+                          <SelectValue placeholder="Select Option" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-zinc-900 border-zinc-800 text-white">
+                          <SelectItem value="Yes">Yes</SelectItem>
+                          <SelectItem value="No">No</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Believe Duty to Provide?</label>
+                      <Input 
+                        type="text" 
+                        placeholder="e.g. Yes, Shared duty, No"
+                        className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10 pl-3"
+                        value={signUpData.believeDutyToProvide}
+                        onChange={(e) => setSignUpData({...signUpData, believeDutyToProvide: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Okay with Spouse Working?</label>
+                      <Input 
+                        type="text" 
+                        placeholder="e.g. Yes, Absolutely, No"
+                        className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10 pl-3"
+                        value={signUpData.areOkayWithWifeWorking}
+                        onChange={(e) => setSignUpData({...signUpData, areOkayWithWifeWorking: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-1.5">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">Prefer Older or Younger?</label>
+                      <Input 
+                        type="text" 
+                        placeholder="e.g. Prefer older, No preference"
+                        className="bg-zinc-950/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs h-10 pl-3"
+                        value={signUpData.preferOlderOrYounger}
+                        onChange={(e) => setSignUpData({...signUpData, preferOlderOrYounger: e.target.value})}
+                      />
+                    </div>
+                    <div className="space-y-1.5 sm:col-span-2">
+                      <label className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider">General Partner Preferences</label>
+                      <textarea 
+                        rows={3}
+                        placeholder="Describe your ideal partner's characteristics, values, personality, and expectations..."
+                        className="w-full bg-zinc-950/80 border border-zinc-800 text-white rounded-xl focus:border-pink-500/50 text-xs p-3 focus:outline-none focus:ring-1 focus:ring-pink-500/30"
+                        value={signUpData.partnerPreferences}
+                        onChange={(e) => setSignUpData({...signUpData, partnerPreferences: e.target.value})}
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {errorMsg && (
+                <p className="text-xs text-rose-400 bg-rose-950/20 border border-rose-950/30 p-2.5 rounded-lg flex items-center gap-2">
+                  <X className="h-4 w-4 shrink-0" /> {errorMsg}
+                </p>
+              )}
+
+              {/* Navigation Controls */}
+              <div className="flex justify-between items-center pt-4 border-t border-white/5">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    if (signUpStep === 1) {
+                      setIsSigningUp(false);
+                      setErrorMsg('');
+                    } else {
+                      setSignUpStep(prev => prev - 1);
+                    }
+                  }}
+                  className="border-zinc-800 bg-zinc-950/40 text-xs h-10 rounded-xl text-zinc-300 hover:text-white"
+                >
+                  Back
+                </Button>
+
+                <Button
+                  type="button"
+                  onClick={(e) => {
+                    if (signUpStep < 4) {
+                      if (signUpStep === 1) {
+                        if (!signUpData.fullName.trim() || !signUpData.phoneNumber.trim()) {
+                          setErrorMsg('Full Name and Phone Number are required fields.');
+                          return;
+                        }
+                        setErrorMsg('');
+                      }
+                      setSignUpStep(prev => prev + 1);
+                    } else {
+                      handleSignUpSubmit(e);
+                    }
+                  }}
+                  className="bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white text-xs font-semibold h-10 rounded-xl border-0 px-5 shadow-lg shadow-pink-500/10"
+                  disabled={isLoading}
+                >
+                  {isLoading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : signUpStep === 4 ? (
+                    'Complete Registration'
+                  ) : (
+                    'Next Step'
+                  )}
+                </Button>
+              </div>
+            </form>
+
+            <div className="text-center text-[10px] text-zinc-500 flex justify-center items-center gap-1">
+              <Shield className="h-3 w-3" /> End-to-end encrypted profile security. All rights reserved.
+            </div>
+          </Card>
+        ) : (
+          <Card className="w-full max-w-md bg-zinc-900/60 border border-white/10 backdrop-blur-2xl shadow-2xl rounded-3xl p-6 sm:p-8 space-y-6 animate-in fade-in zoom-in-95 duration-300">
+            <div className="text-center space-y-2">
+              <div className="inline-flex items-center justify-center p-3 rounded-full bg-gradient-to-r from-pink-500/20 to-purple-500/20 border border-pink-500/30 mb-2">
+                <Heart className="h-8 w-8 text-pink-500 fill-pink-500 animate-pulse" />
+              </div>
+              <h1 className="text-3xl font-extralight tracking-[0.15em] uppercase text-white font-logo">
+                {branding.companyName || 'PUREMATCH'}
+              </h1>
+              <p className="text-sm text-zinc-400 uppercase tracking-widest">Candidate Secure Portal</p>
+            </div>
+
+            <form onSubmit={handleLogin} className="space-y-4">
+              <div className="space-y-1">
+                <label htmlFor="loginInput" className="text-xs font-semibold text-zinc-400 uppercase tracking-wider">Candidate Email or ID Code</label>
+                <div className="relative">
+                  <Input 
+                    id="loginInput"
+                    type="text" 
+                    placeholder="e.g. L101 or your email address"
+                    className="bg-zinc-900/80 border-zinc-800 text-white rounded-xl focus:border-pink-500/50 pl-3 h-11"
+                    value={loginInput}
+                    onChange={(e) => setLoginInput(e.target.value)}
+                    disabled={isLoading}
+                  />
+                </div>
+              </div>
+
+              {errorMsg && (
+                <p className="text-xs text-rose-400 bg-rose-950/20 border border-rose-950/30 p-2.5 rounded-lg flex items-center gap-2">
+                  <X className="h-4 w-4 shrink-0" /> {errorMsg}
+                </p>
+              )}
+
+              <Button 
+                type="submit" 
+                className="w-full h-11 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold rounded-xl border-0 shadow-lg shadow-pink-500/20 transition-all flex justify-center items-center gap-2"
+                disabled={isLoading}
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <>Enter Portal <ArrowRight className="h-4 w-4" /></>
+                )}
+              </Button>
+            </form>
+
+            <div className="text-center pt-1">
+              <p className="text-xs text-zinc-400">
+                New candidate?{' '}
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsSigningUp(true);
+                    setSignUpStep(1);
+                    setErrorMsg('');
+                  }}
+                  className="text-pink-400 hover:text-pink-300 font-bold focus:outline-none transition-colors"
+                >
+                  Register Profile
+                </button>
               </p>
+            </div>
+
+            {/* Sandbox Helper Dropdown */}
+            {sandboxList.length > 0 && (
+              <div className="border-t border-white/5 pt-5 space-y-3">
+                <div className="text-center">
+                  <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/20 text-[10px] uppercase font-bold tracking-wider">
+                    Sandbox Testing Mode Active
+                  </Badge>
+                </div>
+                <p className="text-xs text-zinc-500 text-center">
+                  Select a seed candidate profile below to simulate portal logins instantly.
+                </p>
+                <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto pr-1 no-scrollbar">
+                  {sandboxList.map(p => (
+                    <Button 
+                      key={p.id}
+                      variant="outline"
+                      size="sm"
+                      className="border-zinc-800 bg-zinc-900/40 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white justify-start"
+                      onClick={() => handleQuickSelect(p.code || '')}
+                    >
+                      <User className="h-3 w-3 mr-1.5 opacity-50 shrink-0" />
+                      <span className="truncate">{p.code} ({p.gender})</span>
+                    </Button>
+                  ))}
+                </div>
+              </div>
             )}
 
-            <Button 
-              type="submit" 
-              className="w-full h-11 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-semibold rounded-xl border-0 shadow-lg shadow-pink-500/20 transition-all flex justify-center items-center gap-2"
-              disabled={isLoading}
-            >
-              {isLoading ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <>Enter Portal <ArrowRight className="h-4 w-4" /></>
-              )}
-            </Button>
-          </form>
-
-          {/* Sandbox Helper Dropdown */}
-          {sandboxList.length > 0 && (
-            <div className="border-t border-white/5 pt-5 space-y-3">
-              <div className="text-center">
-                <Badge variant="outline" className="bg-amber-500/10 text-amber-400 border-amber-500/20 text-[10px] uppercase font-bold tracking-wider">
-                  Sandbox Testing Mode Active
-                </Badge>
-              </div>
-              <p className="text-xs text-zinc-500 text-center">
-                Select a seed candidate profile below to simulate portal logins instantly.
-              </p>
-              <div className="grid grid-cols-2 gap-2 max-h-36 overflow-y-auto pr-1 no-scrollbar">
-                {sandboxList.map(p => (
-                  <Button 
-                    key={p.id}
-                    variant="outline"
-                    size="sm"
-                    className="border-zinc-800 bg-zinc-900/40 text-xs text-zinc-300 hover:bg-zinc-800 hover:text-white justify-start"
-                    onClick={() => handleQuickSelect(p.code || '')}
-                  >
-                    <User className="h-3 w-3 mr-1.5 opacity-50 shrink-0" />
-                    <span className="truncate">{p.code} ({p.gender})</span>
-                  </Button>
-                ))}
-              </div>
+            <div className="text-center text-[10px] text-zinc-500 flex justify-center items-center gap-1">
+              <Shield className="h-3 w-3" /> End-to-end encrypted profile security. All rights reserved.
             </div>
-          )}
-
-          <div className="text-center text-[10px] text-zinc-500 flex justify-center items-center gap-1">
-            <Shield className="h-3 w-3" /> End-to-end encrypted profile security. All rights reserved.
-          </div>
-        </Card>
+          </Card>
+        )}
       </div>
     );
   }

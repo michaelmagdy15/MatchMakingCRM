@@ -136,6 +136,22 @@ export default function Reports() {
     ];
   }, [matchPipeline]);
 
+  // Matchmaking success indicators
+  const matchSuccessMetrics = useMemo(() => {
+    const activeProposed = matches.filter(m => m.status !== 'UNMATCHED').length;
+    const photoSwapsCompleted = matches.filter(m => m.malePhotoApproved && m.femalePhotoApproved).length;
+    const contactDetailsShared = matches.filter(
+      m => m.status === 'MATCH_ACTIVE' || 
+           m.status === 'PENDING_FEEDBACK' || 
+           (m.maleContactApproved && m.femaleContactApproved)
+    ).length;
+    return {
+      activeProposed,
+      photoSwapsCompleted,
+      contactDetailsShared
+    };
+  }, [matches]);
+
   // 3. Matchmaker Workload & Balance
   const matchmakerWorkload = useMemo(() => {
     return users.map(user => {
@@ -213,35 +229,34 @@ export default function Reports() {
 
         <Card className="bg-gradient-to-br from-zinc-900/40 via-zinc-950/20 to-zinc-900/40 backdrop-blur-lg border border-white/10 shadow-2xl p-6 rounded-2xl flex flex-col justify-between shadow-black/40">
           <div className="space-y-2">
-            <span className="text-zinc-400 text-xs font-black uppercase tracking-wider block">Approved Candidates</span>
-            <span className="text-4xl font-black text-emerald-400">{candidateFunnel.approved}</span>
+            <span className="text-zinc-400 text-xs font-black uppercase tracking-wider block">Active Matches Proposed</span>
+            <span className="text-4xl font-black text-indigo-400">{matchSuccessMetrics.activeProposed}</span>
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-zinc-500 mt-4">
-            <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-none font-bold">
-              {candidateFunnel.approvalRate} approval rate
-            </Badge>
-          </div>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-zinc-900/40 via-zinc-950/20 to-zinc-900/40 backdrop-blur-lg border border-white/10 shadow-2xl p-6 rounded-2xl flex flex-col justify-between shadow-black/40">
-          <div className="space-y-2">
-            <span className="text-zinc-400 text-xs font-black uppercase tracking-wider block">Pending Profiles</span>
-            <span className="text-4xl font-black text-indigo-400">{candidateFunnel.pending}</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-xs text-indigo-400 mt-4">
+          <div className="flex items-center gap-1.5 text-xs text-indigo-400 font-bold mt-4">
             <Activity className="h-4 w-4" />
-            <span>Awaiting matchmaker review</span>
+            <span>Total match proposals initiated</span>
           </div>
         </Card>
 
         <Card className="bg-gradient-to-br from-zinc-900/40 via-zinc-950/20 to-zinc-900/40 backdrop-blur-lg border border-white/10 shadow-2xl p-6 rounded-2xl flex flex-col justify-between shadow-black/40">
           <div className="space-y-2">
-            <span className="text-zinc-400 text-xs font-black uppercase tracking-wider block">Active Match Couples</span>
-            <span className="text-4xl font-black text-pink-500">{matchPipeline.totalMatches}</span>
+            <span className="text-zinc-400 text-xs font-black uppercase tracking-wider block">Photo Swaps Completed</span>
+            <span className="text-4xl font-black text-pink-400">{matchSuccessMetrics.photoSwapsCompleted}</span>
           </div>
           <div className="flex items-center gap-1.5 text-xs text-pink-400 font-bold mt-4">
-            <Heart className="h-4 w-4" />
-            <span>Matched proposals in pipeline</span>
+            <Sparkles className="h-4 w-4" />
+            <span>Mutual photo approvals</span>
+          </div>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-zinc-900/40 via-zinc-950/20 to-zinc-900/40 backdrop-blur-lg border border-white/10 shadow-2xl p-6 rounded-2xl flex flex-col justify-between shadow-black/40">
+          <div className="space-y-2">
+            <span className="text-zinc-400 text-xs font-black uppercase tracking-wider block">Contact Details Shared</span>
+            <span className="text-4xl font-black text-emerald-400">{matchSuccessMetrics.contactDetailsShared}</span>
+          </div>
+          <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-bold mt-4">
+            <Heart className="h-4 w-4 fill-emerald-500/20" />
+            <span>Successful match connections</span>
           </div>
         </Card>
       </div>

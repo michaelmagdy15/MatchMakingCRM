@@ -1,12 +1,12 @@
 export type ClientStatus = 'Lead' | 'Active' | 'Nearly Expired' | 'Expired' | 'Hold' | 'Pending' | 'Approved' | 'Rejected' | 'Pending Review';
 export type LeadInterest = 'Interested' | 'Not Interested' | 'Pending';
-export type LeadCategory = 'Out of area zone' | 'Social class' | 'Price' | 'No answer' | 'Ladies only' | 'Morning session' | 'Other' | 'None';
+export type LeadCategory = 'Location mismatch' | 'Social status mismatch' | 'Price' | 'No answer' | 'Age mismatch' | 'Religious denomination mismatch' | 'Other' | 'None';
 export type LeadSource = 'Instagram' | 'WhatsApp' | 'Walk-in' | 'TikTok' | 'Other';
-export type LeadStage = 'New' | 'Trial' | 'Follow Up' | 'Converted' | 'Lost';
+export type LeadStage = 'New' | 'Consultation Scheduled' | 'Follow Up' | 'Converted' | 'Lost';
 export type PackageType = 'Private' | 'Group';
 export type UserRole = 'manager' | 'rep' | 'admin' | 'super_admin' | 'crm_admin';
 export type InteractionType = 'Call' | 'WhatsApp' | 'Email' | 'Visit';
-export type InteractionOutcome = 'Interested' | 'Not Answered' | 'Scheduled Trial' | 'Rejected' | 'Other';
+export type InteractionOutcome = 'Interested' | 'Not Answered' | 'Scheduled Consultation' | 'Rejected' | 'Other';
 
 export type Branch = 'CAIRO' | 'GIZA' | 'ONLINE';
 
@@ -20,11 +20,13 @@ export interface Package {
   type: 'Private' | 'Group' | 'Other';
 }
 
-export interface Coach {
+export interface Matchmaker {
   id: string;
   name: string;
   active: boolean;
 }
+
+export type Coach = Matchmaker; // Legacy compatibility mapping
 
 export interface ImportBatch {
   id: string;
@@ -86,7 +88,8 @@ export interface Match {
   branch?: Branch;
 }
 
-export interface PTPackageRecord extends Match {}
+export interface ActivePairing extends Match {}
+export interface PTPackageRecord extends ActivePairing {} // Legacy compatibility mapping
 
 export interface CRMComment {
   id: string;
@@ -109,7 +112,7 @@ export interface AuditLog {
   id: string;
   userId: string;
   action: 'CREATE' | 'UPDATE' | 'DELETE';
-  entityType: 'CLIENT' | 'PAYMENT' | 'PACKAGE_RECORD' | 'LEAD' | 'TARGET' | 'ATTENDANCE' | 'COACH';
+  entityType: 'CLIENT' | 'PAYMENT' | 'PACKAGE_RECORD' | 'LEAD' | 'TARGET' | 'ATTENDANCE' | 'COACH' | 'MATCHMAKER' | 'ACTIVE_PAIRING' | 'MATCH_MEETING';
   entityId: string;
   details: string;
   timestamp: string;
@@ -147,7 +150,7 @@ export interface Profile {
   status: ClientStatus;
   assignedTo?: string; // userId
   branch?: Branch;
-  memberId?: string; // Sequential ID for members
+  memberId?: string; // Sequential ID for matchmaking candidates/profiles
   code?: string; // Sequential ID for matchmaking (L101, G101)
   importBatchId?: string; // ID of the import batch this client was created in
   createdAt?: string;
@@ -199,11 +202,11 @@ export interface Profile {
   expectedVisitDate?: string; // ISO string
   trialDate?: string; // ISO string
   
-  // Member specific
-  packageType?: string; // e.g., "10 S GT Adults", "30 package adult"
-  sessionsRemaining?: number | string; // e.g., 6, 0, -3, or "no attend"
-  startDate?: string; // ISO string
-  membershipExpiry?: string; // ISO string (End Date)
+  // Matchmaking Profile specific
+  packageType?: string; // e.g., "Standard", "Premium" matchmaking plans
+  sessionsRemaining?: number | string; // e.g., remaining introductions/matches or "no attend"
+  startDate?: string; // ISO string of contract start
+  membershipExpiry?: string; // ISO string of contract end/expiry
   dateOfBirth?: string; // ISO string
   points?: number;
   typeOfClient?: string;
@@ -219,7 +222,7 @@ export interface Profile {
 
 export interface Client extends Profile {}
 
-export interface Attendance {
+export interface MatchMeeting {
   id: string;
   clientId: string;
   branch: Branch;
@@ -227,6 +230,8 @@ export interface Attendance {
   recordedBy: string; // userId
   packageName?: string;
 }
+
+export type Attendance = MatchMeeting; // Legacy compatibility mapping
 
 export type TaskStatus = 'Pending' | 'In Progress' | 'Completed';
 export type TaskPriority = 'Low' | 'Medium' | 'High';
