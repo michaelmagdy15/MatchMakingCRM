@@ -12,6 +12,13 @@ RUN npm ci --ignore-scripts
 # Copy the rest of the application source code
 COPY . .
 
+# Accept build arguments for Vite environment variables (Vite embeds these at build time)
+ARG VITE_SUPABASE_URL
+ARG VITE_SUPABASE_ANON_KEY
+
+ENV VITE_SUPABASE_URL=$VITE_SUPABASE_URL
+ENV VITE_SUPABASE_ANON_KEY=$VITE_SUPABASE_ANON_KEY
+
 # Build the production application
 RUN npm run build
 
