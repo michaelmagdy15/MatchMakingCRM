@@ -1,0 +1,266 @@
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
+
+import React from 'react';
+import { AppProvider, useAppContext } from './context';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Button } from '@/components/ui/button';
+import { BrowserRouter } from 'react-router-dom';
+import Dashboard from './Dashboard';
+import Leads from './Leads';
+import Clients from './Clients';
+import AuditLogs from './AuditLogs';
+import Tasks from './Tasks';
+import Settings from './Settings';
+import Login from './Login';
+import Reports from './Reports';
+import Portal from './Portal';
+import { Activity, Users, UserPlus, CreditCard, LogOut, Calendar as CalendarIcon, ShieldAlert, Settings as SettingsIcon, Eye, EyeOff, CheckSquare, Package, Search, Scan, History, BarChart3, Sun, Moon } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { NotificationCenter } from './components/NotificationCenter';
+
+function AppContent() {
+  const { currentUser, logout, isAuthReady, previewRole, setPreviewRole, searchQuery, setSearchQuery, branding, canAccessSettings, canViewGlobalDashboard, canDeletePayments, isManagerOrAdmin } = useAppContext();
+
+  const [theme, setTheme] = React.useState<'dark' | 'light'>(() => {
+    const saved = localStorage.getItem('crm-theme');
+    if (saved === 'light' || saved === 'dark') return saved;
+    return document.documentElement.classList.contains('dark') ? 'dark' : 'light';
+  });
+
+  React.useEffect(() => {
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+    localStorage.setItem('crm-theme', theme);
+  }, [theme]);
+
+  const toggleTheme = () => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
+
+  if (!isAuthReady) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  const isPortal = window.location.pathname.startsWith('/portal');
+  if (isPortal) {
+    return <Portal />;
+  }
+
+  if (!currentUser) {
+    return <Login />;
+  }
+
+  return (
+    <div className="min-h-screen bg-background text-foreground flex flex-col font-sans">
+      <header className="border-b bg-card shadow-sm sticky top-0 z-50">
+        <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+          <div className="flex items-center space-x-4 flex-1">
+            <div className="flex items-center space-x-2">
+              {branding.logoUrl ? (
+                <img 
+                  src={branding.logoUrl} 
+                  alt={branding.companyName} 
+                  className="h-8 w-auto object-contain"
+                  referrerPolicy="no-referrer"
+                />
+              ) : (
+                <h1 className="text-xl sm:text-2xl font-extralight tracking-[0.2em] uppercase text-primary font-logo">
+                  {branding.companyName}
+                </h1>
+              )}
+            </div>
+            <div className="hidden md:flex relative w-full max-w-sm">
+              <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="search"
+                placeholder="Search by name, phone, or ID..."
+                className="w-full pl-9 bg-muted/50 border-none"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+              />
+            </div>
+            {currentUser.email === "michaelmitry13@gmail.com" && (
+              <div className="hidden sm:flex items-center space-x-2 h-8">
+                <Select 
+                  value={previewRole || "none"} 
+                  onValueChange={(v) => setPreviewRole(v === "none" ? null : v as any)}
+                >
+                  <SelectTrigger className={`h-8 w-[150px] text-xs ${previewRole ? 'border-amber-500 text-amber-600 font-medium' : ''}`}>
+                    <div className="flex items-center">
+                       {previewRole ? <Eye className="h-3.5 w-3.5 mr-2" /> : <EyeOff className="h-3.5 w-3.5 mr-2" />}
+                       <SelectValue placeholder="Preview Role" />
+                    </div>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="none">Exit Preview</SelectItem>
+                    <SelectItem value="crm_admin">CRM Admin</SelectItem>
+                    <SelectItem value="super_admin">Super Admin</SelectItem>
+                    <SelectItem value="admin">Admin</SelectItem>
+                    <SelectItem value="manager">Manager</SelectItem>
+                    <SelectItem value="rep">Sales Rep</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+          <div className="flex items-center space-x-2 sm:space-x-4 ml-auto">
+            <div className="md:hidden">
+              <Button variant="ghost" size="icon" onClick={() => {
+                const searchBar = document.getElementById('mobile-search');
+                if (searchBar) searchBar.classList.toggle('hidden');
+              }}>
+                <Search className="h-4 w-4 sm:h-5 sm:w-5" />
+              </Button>
+            </div>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              onClick={toggleTheme} 
+              className="h-8 w-8 sm:h-10 sm:w-10 text-muted-foreground hover:text-foreground"
+              title={theme === 'dark' ? 'Switch to Light Mode' : 'Switch to Dark Mode'}
+            >
+              {theme === 'dark' ? (
+                <Sun className="h-4 w-4 sm:h-5 sm:w-5 text-amber-400" />
+              ) : (
+                <Moon className="h-4 w-4 sm:h-5 sm:w-5 text-indigo-400" />
+              )}
+            </Button>
+            <NotificationCenter />
+            <div className="text-xs sm:text-sm font-medium text-muted-foreground flex flex-col items-end">
+              <span className="font-bold text-foreground truncate max-w-[120px] sm:max-w-none">{currentUser.name}</span>
+              <span className={`text-[10px] sm:text-xs uppercase tracking-wider ${previewRole ? 'text-amber-500 font-bold' : ''}`}>
+                {previewRole ? `PREVIEW: ${previewRole}` : currentUser.role}
+              </span>
+            </div>
+            <Button variant="ghost" size="icon" onClick={logout} title="Logout" className="h-8 w-8 sm:h-10 sm:w-10">
+              <LogOut className="h-4 w-4 sm:h-5 sm:w-5" />
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      <div id="mobile-search" className="hidden md:hidden bg-card border-b p-2">
+        <div className="relative w-full">
+          <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Input
+            type="search"
+            placeholder="Search by name, phone, or ID..."
+            className="w-full pl-9 bg-muted/50 border-none"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+          />
+        </div>
+      </div>
+
+      <main className="flex-1 container mx-auto px-4 py-6 sm:py-8">
+        <Tabs defaultValue="dashboard" className="space-y-6">
+          <div className="overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 no-scrollbar">
+            <TabsList className="flex w-max sm:w-full bg-muted/50 rounded-lg p-1 justify-start sm:justify-center">
+              <TabsTrigger value="dashboard" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 sm:px-4 text-xs sm:text-sm">Match Control Center</TabsTrigger>
+              
+              {(currentUser.role === 'manager' || currentUser.role === 'rep' || currentUser.role === 'admin' || currentUser.role === 'super_admin' || currentUser.role === 'crm_admin') && (
+                <TabsTrigger value="leads" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 sm:px-4 text-xs sm:text-sm">
+                  <UserPlus className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
+                  Dating Leads
+                </TabsTrigger>
+              )}
+              
+              <TabsTrigger value="clients" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 sm:px-4 text-xs sm:text-sm">
+                <Users className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
+                Profiles Directory
+              </TabsTrigger>
+
+              {currentUser.role !== 'admin' && (
+                <TabsTrigger value="tasks" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 sm:px-4 text-xs sm:text-sm">
+                  <CheckSquare className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
+                  Tasks/Checkups
+                </TabsTrigger>
+              )}
+
+
+              {isManagerOrAdmin && (
+                <TabsTrigger value="reports" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 sm:px-4 text-xs sm:text-sm">
+                  <BarChart3 className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
+                  Match Reports
+                </TabsTrigger>
+              )}
+
+              {canAccessSettings && (
+                <>
+                  <TabsTrigger value="audit" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 sm:px-4 text-xs sm:text-sm">
+                    <History className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
+                    Audit Logs
+                  </TabsTrigger>
+                  <TabsTrigger value="settings" className="data-[state=active]:bg-background data-[state=active]:shadow-sm px-3 sm:px-4 text-xs sm:text-sm">
+                    <SettingsIcon className="h-3.5 w-3.5 sm:h-4 sm:w-4 mr-1.5 sm:mr-2" />
+                    System Settings
+                  </TabsTrigger>
+                </>
+              )}
+            </TabsList>
+          </div>
+
+          <TabsContent value="dashboard" className="m-0 animate-in fade-in-50 duration-500">
+            <Dashboard />
+          </TabsContent>
+
+          {(currentUser.role === 'manager' || currentUser.role === 'rep' || currentUser.role === 'admin' || currentUser.role === 'super_admin' || currentUser.role === 'crm_admin') && (
+            <TabsContent value="leads" className="m-0 animate-in fade-in-50 duration-500">
+              <Leads />
+            </TabsContent>
+          )}
+
+          <TabsContent value="clients" className="m-0 animate-in fade-in-50 duration-500">
+            <Clients />
+          </TabsContent>
+
+          {currentUser.role !== 'admin' && (
+            <TabsContent value="tasks" className="m-0 animate-in fade-in-50 duration-500">
+              <Tasks />
+            </TabsContent>
+          )}
+
+
+
+          {isManagerOrAdmin && (
+            <TabsContent value="reports" className="m-0 animate-in fade-in-50 duration-500">
+              <Reports />
+            </TabsContent>
+          )}
+
+          {canAccessSettings && (
+            <>
+              <TabsContent value="audit" className="m-0 animate-in fade-in-50 duration-500">
+                <AuditLogs />
+              </TabsContent>
+              <TabsContent value="settings" className="m-0 animate-in fade-in-50 duration-500">
+                <Settings />
+              </TabsContent>
+            </>
+          )}
+        </Tabs>
+      </main>
+    </div>
+  );
+}
+
+export default function App() {
+  return (
+    <BrowserRouter>
+      <AppProvider>
+        <AppContent />
+      </AppProvider>
+    </BrowserRouter>
+  );
+}

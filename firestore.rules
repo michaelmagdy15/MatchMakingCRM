@@ -1,0 +1,199 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // ===============================================================
+    // Helper Functions
+    // ===============================================================
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function getUserData() {
+      let uid = request.auth != null ? request.auth.uid : 'anonymous';
+      let userPath = /databases/$(database)/documents/users/$(uid);
+      return (request.auth != null && exists(userPath)) ? get(userPath).data : {
+        "role": "none",
+        "name": "Anonymous",
+        "can_delete_payments": false,
+        "can_access_settings_and_history": false,
+        "can_view_global_dashboard": false
+      };
+    }
+
+    function isOwner(userId) {
+      return request.auth != null && request.auth.uid == userId;
+    }
+
+    function canDeletePayments() {
+      let data = getUserData();
+      return request.auth != null && (
+        data.role in ['super_admin', 'crm_admin', 'sales_manager', 'manager'] ||
+        data.can_delete_payments == true
+      );
+    }
+
+    function canAccessSettings() {
+      let data = getUserData();
+      return request.auth != null && (
+        data.role in ['super_admin', 'crm_admin', 'sales_manager', 'manager'] ||
+        data.can_access_settings_and_history == true
+      );
+    }
+
+    function canViewGlobalDashboard() {
+      let data = getUserData();
+      return request.auth != null && (
+        data.role in ['super_admin', 'crm_admin', 'sales_manager', 'manager'] ||
+        data.can_view_global_dashboard == true
+      );
+    }
+
+    function isAdmin() {
+      let data = getUserData();
+      return request.auth != null && (
+        data.role in ['admin', 'super_admin', 'crm_admin', 'sales_manager', 'manager']
+      );
+    }
+
+    function isSalesManager() {
+      return canViewGlobalDashboard();
+    }
+
+    function isSalesRep() {
+      let data = getUserData();
+      return request.auth != null && (data.role == 'sales_rep' || data.role == 'rep');
+    }
+
+    // ===============================================================
+    // Entity Validators
+    // ===============================================================
+
+    function isValidClient(data) {
+      return data.name is string && data.name.size() > 0 &&
+             data.phone is string && data.phone.size() > 0 &&
+             data.status in ["Lead", "Active", "Nearly Expired", "Expired", "Hold"];
+    }
+
+    function isValidPayment(data) {
+      return data.clientId is string &&
+             data.amount_paid is number && data.amount_paid >= 0 &&
+             data.sales_rep_id is string;
+    }
+
+    function isValidMatch(data) {
+      return data.maleId is string && data.maleId.size() > 0 &&
+             data.maleName is string && data.maleName.size() > 0 &&
+             data.femaleId is string && data.femaleId.size() > 0 &&
+             data.femaleName is string && data.femaleName.size() > 0 &&
+             data.status in [
+               "PENDING_PROFILE_APPROVAL",
+               "PENDING_PHOTO_APPROVAL",
+               "PENDING_CONTACT_SHARE",
+               "MATCH_ACTIVE",
+               "PENDING_FEEDBACK"
+             ];
+    }
+
+    // ===============================================================
+    // Rules
+    // ===============================================================
+
+    match /users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) || isAdmin();
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /targets/{targetId} {
+      allow get: if canViewGlobalDashboard() || (isSalesRep() && resource.data.sales_rep_id == request.auth.uid);
+      allow list: if canViewGlobalDashboard() || isSalesRep();
+      allow write: if isSalesManager();
+    }
+
+    match /userTargets/{targetId} {
+      allow get: if canViewGlobalDashboard() || (isSalesRep() && resource.data.userId == request.auth.uid);
+      allow list: if canViewGlobalDashboard() || isSalesRep();
+      allow write: if isSalesManager();
+    }
+
+    match /payments/{paymentId} {
+      allow get: if canViewGlobalDashboard() || (isSalesRep() && resource.data.sales_rep_id == request.auth.uid);
+      allow list: if canViewGlobalDashboard() || isSalesRep();
+      allow create: if isAuthenticated() && isValidPayment(request.resource.data);
+      allow update, delete: if canDeletePayments();
+    }
+
+    match /settings/{settingId} {
+      allow read: if canAccessSettings();
+      allow write: if canAccessSettings();
+    }
+
+    match /auditLogs/{logId} {
+      allow read: if canAccessSettings();
+      allow create: if isAuthenticated();
+      allow delete: if canAccessSettings();
+    }
+
+    // ===============================================================
+    // Collection Group Rules
+    // ===============================================================
+    match /{path=**}/comments/{commentId} {
+      allow read, create: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    match /{path=**}/interactions/{interactionId} {
+      allow read, create: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+
+    match /clients/{clientId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidClient(request.resource.data);
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    match /packages/{packageId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /coaches/{coachId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin();
+    }
+
+    match /sessions/{sessionId} {
+      allow read: if isAuthenticated();
+      allow create, update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    match /matches/{matchId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidMatch(request.resource.data);
+      allow update: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    match /attendance/{attendanceId} {
+      allow read, create: if isAuthenticated();
+      allow delete: if isAdmin();
+    }
+
+    match /tasks/{taskId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /counters/{counterId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /importBatches/{batchId} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

@@ -1,0 +1,151 @@
+{
+  "entities": {
+    "Client": {
+      "title": "Client",
+      "description": "A client or lead in the system",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "phone": { "type": "string" },
+        "status": { "type": "string", "enum": ["Lead", "Active", "Nearly Expired", "Expired"] },
+        "assignedTo": { "type": "string", "description": "User ID of the assigned representative" },
+        "interest": { "type": "string", "enum": ["Interested", "Not Interested", "Pending"] },
+        "category": { "type": "string", "enum": ["Out of area zone", "Social class", "Price", "No answer", "Other", "None"] },
+        "source": { "type": "string", "enum": ["Instagram", "WhatsApp", "Walk-in", "Social Media", "Other"] },
+        "stage": { "type": "string", "enum": ["New", "Trial", "Follow Up", "Converted", "Lost"] },
+        "expectedVisitDate": { "type": "string", "format": "date-time" },
+        "trialDate": { "type": "string", "format": "date-time" },
+        "packageType": { "type": "string" },
+        "sessionsRemaining": { "type": "number" },
+        "startDate": { "type": "string", "format": "date-time" },
+        "membershipExpiry": { "type": "string", "format": "date-time" },
+        "dateOfBirth": { "type": "string", "format": "date-time" },
+        "points": { "type": "number" },
+        "lastContactDate": { "type": "string", "format": "date-time" },
+        "nextReminderDate": { "type": "string", "format": "date-time" }
+      },
+      "required": ["name", "phone", "status"]
+    },
+    "Comment": {
+      "title": "Comment",
+      "description": "A comment on a client or lead",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "text": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "author": { "type": "string" }
+      },
+      "required": ["text", "date", "author"]
+    },
+    "Payment": {
+      "title": "Payment",
+      "description": "A payment record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clientId": { "type": "string" },
+        "client_name": { "type": "string" },
+        "amount": { "type": "number" },
+        "amount_paid": { "type": "number" },
+        "date": { "type": "string", "format": "date-time" },
+        "method": { "type": "string", "enum": ["Cash", "Credit Card", "Bank Transfer", "Instapay", "Other"] },
+        "instapayRef": { "type": "string", "description": "12-digit reference number for Instapay" },
+        "packageType": { "type": "string" },
+        "session_type": { "type": "string", "enum": ["Private Training", "Group Training"] },
+        "coach_name": { "type": "string", "description": "Required if session_type is Private Training" },
+        "sales_rep_id": { "type": "string", "description": "User ID of the rep who made the sale" },
+        "created_at": { "type": "string", "format": "date-time" },
+        "deleted_at": { "type": "string", "format": "date-time", "description": "Timestamp for soft deletion" }
+      },
+      "required": ["clientId", "client_name", "amount", "amount_paid", "date", "method", "packageType", "session_type", "sales_rep_id", "created_at"]
+    },
+    "Target": {
+      "title": "Target",
+      "description": "Staff monthly sales targets",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "sales_rep_id": { "type": "string" },
+        "month_year": { "type": "string", "description": "Format: YYYY-MM" },
+        "target_total_private": { "type": "number" },
+        "target_total_group": { "type": "number" }
+      },
+      "required": ["sales_rep_id", "month_year", "target_total_private", "target_total_group"]
+    },
+    "PrivateSession": {
+      "title": "PrivateSession",
+      "description": "A private session record",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clientId": { "type": "string" },
+        "date": { "type": "string", "format": "date-time" },
+        "status": { "type": "string", "enum": ["Scheduled", "Attended", "No Show", "Cancelled"] },
+        "notes": { "type": "string" }
+      },
+      "required": ["clientId", "date", "status"]
+    },
+    "AuditLog": {
+      "title": "AuditLog",
+      "description": "A system audit log",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "userId": { "type": "string" },
+        "action": { "type": "string", "enum": ["CREATE", "UPDATE", "DELETE"] },
+        "entityType": { "type": "string", "enum": ["CLIENT", "PAYMENT", "SESSION", "LEAD", "TARGET"] },
+        "entityId": { "type": "string" },
+        "details": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["userId", "action", "entityType", "entityId", "timestamp"]
+    },
+    "User": {
+      "title": "User",
+      "description": "A system user",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "name": { "type": "string" },
+        "role": { "type": "string", "enum": ["admin", "sales_manager", "sales_rep", "manager", "rep"] },
+        "email": { "type": "string", "format": "email" },
+        "can_delete_payments": { "type": "boolean" },
+        "can_view_global_dashboard": { "type": "boolean" },
+        "can_access_settings_and_history": { "type": "boolean" }
+      },
+      "required": ["name", "role", "email"]
+    }
+  },
+  "firestore": {
+    "/clients/{clientId}": {
+      "schema": { "$ref": "Client" },
+      "description": "Collection of clients and leads"
+    },
+    "/clients/{clientId}/comments/{commentId}": {
+      "schema": { "$ref": "Comment" },
+      "description": "Subcollection of comments for a client"
+    },
+    "/payments/{paymentId}": {
+      "schema": { "$ref": "Payment" },
+      "description": "Collection of payment records"
+    },
+    "/targets/{targetId}": {
+      "schema": { "$ref": "Target" },
+      "description": "Collection of staff sales targets"
+    },
+    "/sessions/{sessionId}": {
+      "schema": { "$ref": "PrivateSession" },
+      "description": "Collection of private session records"
+    },
+    "/auditLogs/{logId}": {
+      "schema": { "$ref": "AuditLog" },
+      "description": "Collection of system audit logs"
+    },
+    "/users/{userId}": {
+      "schema": { "$ref": "User" },
+      "description": "Collection of system users"
+    }
+  }
+}
