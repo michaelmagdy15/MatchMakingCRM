@@ -36,7 +36,9 @@ import {
   Compass,
   Smile,
   BadgeAlert,
-  Download
+  Download,
+  ShieldCheck,
+  ExternalLink
 } from 'lucide-react';
 import { Client, InteractionType, InteractionOutcome, ClientStatus } from './types';
 import { format, parseISO } from 'date-fns';
@@ -69,6 +71,7 @@ export default function Clients() {
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
   const [isBulkDeleteDialogOpen, setIsBulkDeleteDialogOpen] = useState(false);
   const [profileToDelete, setProfileToDelete] = useState<string | null>(null);
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
 
   // Filters state
   const [searchTerm, setSearchTerm] = useState('');
@@ -327,6 +330,240 @@ export default function Clients() {
     }
   };
 
+  // Extracted Reusable Profile View Dialog content (Deduplicated Desktop/Mobile code)
+  const renderProfileDialogContent = (candidate: any) => {
+    const isRevealed = revealedClients[candidate.id] === true;
+    const rawProf = rawProfiles.find(rp => rp.id === candidate.id) || candidate;
+    const dispPhone = isRevealed ? rawProf.phone || rawProf.phoneNumber : candidate.phone;
+    const dispEmail = isRevealed ? rawProf.email : maskEmail(candidate.email);
+    const dispFB = isRevealed ? rawProf.facebookLink : maskFacebook(candidate.facebookLink);
+    const comments = candidate.comments || [];
+
+    return (
+      <DialogContent className="w-[95vw] max-w-[1000px] sm:max-w-[90vw] md:max-w-[1000px] max-h-[90vh] overflow-hidden flex flex-col p-0 border border-white/10 bg-zinc-900/90 backdrop-blur-xl text-white shadow-2xl rounded-2xl shadow-black/80">
+        <DialogHeader className="p-6 border-b border-white/5 bg-zinc-900/40 flex flex-row items-center justify-between">
+          <div>
+            <DialogTitle className="text-2xl font-extrabold flex items-center gap-3">
+              Candidate Details: <span className="text-pink-400 font-black">{candidate.code || 'C-XXX'}</span>
+              {getStatusBadge(candidate.status)}
+            </DialogTitle>
+            <p className="text-xs text-zinc-400 mt-1">Full profile mapping for matchmaker audits.</p>
+          </div>
+          <div className="pr-8 flex items-center gap-3">
+            {!isRevealed && isManagerOrAdmin && (
+              <Button 
+                onClick={() => handleReveal(candidate.id)} 
+                className="bg-amber-600 hover:bg-amber-700 text-white border-none font-extrabold h-9 px-4 rounded-xl text-xs"
+              >
+                <Unlock className="h-3.5 w-3.5 mr-2" /> Reveal Sensitive Details
+              </Button>
+            )}
+            {isRevealed && (
+              <Badge className="bg-amber-500/20 text-amber-400 border border-amber-500/30 px-3 py-1 text-xs font-extrabold rounded-xl">
+                UNLOCKED ADMIN PRIVACY
+              </Badge>
+            )}
+          </div>
+        </DialogHeader>
+
+        {/* Candidate Info Grid content */}
+        <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Left Bento: Primary Dating Fields */}
+            <div className="lg:col-span-2 space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <Card className="bg-zinc-900/50 border-white/5 p-4 rounded-xl space-y-2">
+                  <h4 className="text-xs font-black uppercase text-pink-400 tracking-wider flex items-center gap-2">
+                    <Smile className="h-4 w-4" /> Personal Metrics
+                  </h4>
+                  <div className="space-y-1.5 text-xs text-zinc-300">
+                    <div className="flex justify-between py-1 border-b border-white/5">
+                      <span className="text-zinc-500">Gender:</span>
+                      <span className="font-semibold text-white">{candidate.gender || 'Not specified'}</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-white/5">
+                      <span className="text-zinc-500">Age:</span>
+                      <span className="font-semibold text-white">{candidate.age || candidate.finalAge || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-white/5">
+                      <span className="text-zinc-500">Height:</span>
+                      <span className="font-semibold text-white">{candidate.height || 'Not specified'}</span>
+                    </div>
+                    <div className="flex justify-between py-1">
+                      <span className="text-zinc-500">Residence:</span>
+                      <span className="font-semibold text-white">{candidate.locationOfResidence || 'Not set'}</span>
+                    </div>
+                  </div>
+                </Card>
+
+                <Card className="bg-zinc-900/50 border-white/5 p-4 rounded-xl space-y-2">
+                  <h4 className="text-xs font-black uppercase text-pink-400 tracking-wider flex items-center gap-2">
+                    <BookOpen className="h-4 w-4" /> Education & Career
+                  </h4>
+                  <div className="space-y-1.5 text-xs text-zinc-300">
+                    <div className="flex justify-between py-1 border-b border-white/5">
+                      <span className="text-zinc-500">University:</span>
+                      <span className="font-semibold text-white truncate max-w-[120px]">{candidate.university || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-white/5">
+                      <span className="text-zinc-500">Faculty:</span>
+                      <span className="font-semibold text-white truncate max-w-[120px]">{candidate.faculty || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-white/5">
+                      <span className="text-zinc-500">Job Title:</span>
+                      <span className="font-semibold text-white truncate max-w-[120px]">{candidate.jobTitle || 'N/A'}</span>
+                    </div>
+                    <div className="flex justify-between py-1">
+                      <span className="text-zinc-500">Origin:</span>
+                      <span className="font-semibold text-white">{candidate.originOfResidence || 'Not specified'}</span>
+                    </div>
+                  </div>
+                </Card>
+              </div>
+
+              {/* Partner Preferences Bento Card */}
+              <Card className="bg-zinc-900/50 border-white/5 p-5 rounded-xl space-y-4">
+                <h4 className="text-xs font-black uppercase text-pink-400 tracking-wider flex items-center gap-2 border-b border-white/5 pb-2">
+                  <Heart className="h-4 w-4" /> Partner Criteria & Matching Preferences
+                </h4>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 text-xs text-zinc-300">
+                  <div className="space-y-2">
+                    <div className="flex justify-between py-1 border-b border-white/5">
+                      <span className="text-zinc-500">Target Age Range:</span>
+                      <span className="font-semibold text-white">{candidate.ageRangePartnerPreferences || 'Open'}</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-white/5">
+                      <span className="text-zinc-500">Target Height Range:</span>
+                      <span className="font-semibold text-white">{candidate.heightPartnerPreferences || 'Open'}</span>
+                    </div>
+                    <div className="flex justify-between py-1">
+                      <span className="text-zinc-500">Accepted Residencies:</span>
+                      <span className="font-semibold text-white">{candidate.acceptableResidencesPartnerPreferences || 'Any'}</span>
+                    </div>
+                  </div>
+                  <div className="space-y-2">
+                    <div className="flex justify-between py-1 border-b border-white/5">
+                      <span className="text-zinc-500">Target Origin:</span>
+                      <span className="font-semibold text-white">{candidate.acceptableOriginsPartnerPreferences || 'Open'}</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-white/5">
+                      <span className="text-zinc-500">Target Education:</span>
+                      <span className="font-semibold text-white">{candidate.acceptableEducationPartnerPreferences || 'Open'}</span>
+                    </div>
+                    <div className="flex justify-between py-1">
+                      <span className="text-zinc-500">Must Have Qualities:</span>
+                      <span className="font-semibold text-white truncate max-w-[120px]">{candidate.qualitiesDescriptionPartnerPreferences || 'None set'}</span>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+
+              {/* Personal Bio Description Block */}
+              <div className="bg-zinc-950/40 p-4 rounded-xl border border-white/5 space-y-2">
+                <h5 className="text-[10px] font-black uppercase text-zinc-500 tracking-wider flex items-center gap-1">
+                  <MessageSquare className="h-3 w-3" /> Candidate Self Description
+                </h5>
+                <p className="text-zinc-300 text-xs leading-relaxed italic">{candidate.describeYourself || 'No candidate self description provided.'}</p>
+              </div>
+            </div>
+
+            {/* Right Bento: Admin / Audit Metrics & Secret Notes */}
+            <div className="space-y-6">
+              {/* RLS Masked Sensitive Card */}
+              <Card className="bg-zinc-950/80 border-amber-500/20 p-4 rounded-xl space-y-3 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />
+                <h4 className="text-xs font-black uppercase text-amber-500 tracking-wider flex items-center gap-2">
+                  <ShieldCheck className="h-4 w-4" /> Matchmaker Vault
+                </h4>
+                <div className="space-y-2.5 text-xs">
+                  <div>
+                    <span className="text-zinc-500 block text-[10px] uppercase font-bold">Full Legal Name</span>
+                    <span className="font-semibold text-zinc-200">{candidate.fullName || 'Confidential'}</span>
+                  </div>
+                  <div>
+                    <span className="text-zinc-500 block text-[10px] uppercase font-bold">Direct Phone Number</span>
+                    <span className="font-mono text-zinc-200">{dispPhone || 'Confidential'}</span>
+                  </div>
+                  <div>
+                    <span className="text-zinc-500 block text-[10px] uppercase font-bold">Email Address</span>
+                    <span className="text-zinc-200">{dispEmail || 'Confidential'}</span>
+                  </div>
+                  <div>
+                    <span className="text-zinc-500 block text-[10px] uppercase font-bold">Facebook Profile Link</span>
+                    {candidate.facebookLink ? (
+                      isRevealed ? (
+                        <a href={candidate.facebookLink} target="_blank" rel="noopener noreferrer" className="text-pink-400 hover:underline flex items-center gap-1">
+                          Visit Facebook Profile <ExternalLink className="h-3 w-3" />
+                        </a>
+                      ) : (
+                        <span className="text-zinc-400 font-mono">{dispFB}</span>
+                      )
+                    ) : (
+                      <span className="text-zinc-600 italic">Not set</span>
+                    )}
+                  </div>
+                </div>
+              </Card>
+
+              {/* Internal Engagement & Match Audit Comments */}
+              <div className="bg-zinc-900/30 p-4 rounded-xl border border-white/5 space-y-4">
+                <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                  <h5 className="text-[10px] font-black uppercase text-zinc-400 tracking-wider flex items-center gap-1.5">
+                    <MessageSquare className="h-3.5 w-3.5 text-pink-400" /> Matchmaker Logs ({comments.length})
+                  </h5>
+                  {isManagerOrAdmin && (
+                    <Dialog>
+                      <DialogTrigger asChild>
+                        <Button size="sm" className="h-6 bg-pink-600 hover:bg-pink-700 text-[10px] font-extrabold rounded-lg px-2">
+                          + Add Log
+                        </Button>
+                      </DialogTrigger>
+                      <DialogContent className="bg-zinc-900 border-white/10 text-white max-w-sm rounded-xl">
+                        <DialogHeader>
+                          <DialogTitle className="text-sm font-bold uppercase tracking-wider text-zinc-300">Add Log Entry</DialogTitle>
+                        </DialogHeader>
+                        <div className="space-y-3 py-3">
+                          <Textarea 
+                            placeholder="Type Matchmaker internal comment..." 
+                            className="bg-zinc-950 border-zinc-800 text-xs min-h-[80px]"
+                            value={newComment}
+                            onChange={(e) => setNewComment(e.target.value)}
+                          />
+                          <Button 
+                            onClick={() => handleAddComment(candidate.id)} 
+                            className="w-full bg-pink-600 hover:bg-pink-700 text-xs font-bold h-9"
+                          >
+                            Post Log Entry
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                </div>
+
+                <div className="space-y-3 max-h-[220px] overflow-y-auto pr-1 custom-scrollbar">
+                  {comments.length > 0 ? (
+                    comments.map(c => (
+                      <div key={c.id} className="bg-zinc-950/40 p-2.5 rounded-lg border border-white/5 text-[11px] space-y-1.5">
+                        <div className="flex justify-between items-center text-zinc-500">
+                          <span className="font-bold text-pink-400/90">{c.authorName || 'Matchmaker'}</span>
+                          <span>{new Date(c.createdAt).toLocaleDateString()}</span>
+                        </div>
+                        <p className="text-zinc-200">{c.text}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="text-xs text-zinc-600 italic text-center py-4">No comments recorded.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </DialogContent>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Header and Add Button */}
@@ -434,7 +671,7 @@ export default function Clients() {
         </TabsList>
 
         {/* Multi-Dimensional Advanced Filters Grid */}
-        <Card className="bg-gradient-to-br from-zinc-900/40 via-zinc-950/20 to-zinc-900/40 backdrop-blur-lg border border-white/10 shadow-2xl rounded-2xl shadow-black/50">
+        <Card className="hidden md:block bg-gradient-to-br from-zinc-900/40 via-zinc-950/20 to-zinc-900/40 backdrop-blur-lg border border-white/10 shadow-2xl rounded-2xl shadow-black/50">
           <CardHeader className="pb-3 flex flex-row items-center gap-2">
             <Filter className="h-4 w-4 text-pink-400" />
             <CardTitle className="text-sm font-bold uppercase tracking-wider text-zinc-300">Advanced Match Filters</CardTitle>
@@ -576,6 +813,166 @@ export default function Clients() {
         </Card>
 
         {/* Profiles Table View */}
+                {/* Mobile Float Filter Button & Toggle Panel */}
+        <div className="md:hidden flex justify-between items-center gap-3 p-4 bg-zinc-950 border border-white/5 rounded-xl mb-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-500" />
+            <Input 
+              placeholder="Search Code, Residence..." 
+              className="pl-8 bg-zinc-900 border-zinc-800 text-xs h-9 text-white placeholder:text-zinc-600 rounded-lg"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <Button 
+            onClick={() => setIsMobileFilterOpen(true)}
+            className="bg-zinc-900 border border-white/10 text-white rounded-lg h-9 px-3 flex items-center gap-1.5 text-xs"
+          >
+            <Filter className="h-3.5 w-3.5 text-pink-400" />
+            Filters
+            {(filterStatus !== 'All' || filterLocation !== 'All' || filterReligion !== 'All' || filterAdmin !== 'All' || minAge || maxAge || minHeight || maxHeight) && (
+              <span className="bg-pink-500 text-white rounded-full text-[10px] px-1 font-bold">!</span>
+            )}
+          </Button>
+        </div>
+
+        {/* Mobile Filter Drawer Overlay */}
+        <div className={`fixed inset-0 z-50 transition-all duration-300 ${isMobileFilterOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsMobileFilterOpen(false)} />
+          <div className={`fixed bottom-0 left-0 right-0 max-h-[85vh] bg-zinc-950 border-t border-white/10 rounded-t-3xl p-6 overflow-y-auto transition-transform duration-300 transform ${isMobileFilterOpen ? 'translate-y-0' : 'translate-y-full'} text-white space-y-6`}>
+            <div className="flex justify-between items-center border-b border-white/5 pb-3">
+              <h3 className="text-base font-bold flex items-center gap-2">
+                <Filter className="h-5 w-5 text-pink-400" /> Advanced Filters
+              </h3>
+              <Button variant="ghost" onClick={() => setIsMobileFilterOpen(false)} className="text-zinc-400 hover:text-white text-xs font-semibold">
+                Done
+              </Button>
+            </div>
+            
+            <div className="space-y-4">
+              {/* Status */}
+              <div className="space-y-1">
+                <Label className="text-zinc-400 text-xs font-bold uppercase tracking-wider">Status</Label>
+                <Select value={filterStatus} onValueChange={setFilterStatus}>
+                  <SelectTrigger className="w-full bg-zinc-900 border-zinc-800 text-xs h-10 text-white"><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-zinc-900 border-zinc-800 text-white">
+                    <SelectItem value="All">All statuses</SelectItem>
+                    <SelectItem value="Pending">Pending review</SelectItem>
+                    <SelectItem value="Approved">Approved</SelectItem>
+                    <SelectItem value="Hold">Hold</SelectItem>
+                    <SelectItem value="Rejected">Rejected</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Location */}
+              <div className="space-y-1">
+                <Label className="text-zinc-400 text-xs font-bold uppercase tracking-wider">Location</Label>
+                <Select value={filterLocation} onValueChange={setFilterLocation}>
+                  <SelectTrigger className="w-full bg-zinc-900 border-zinc-800 text-xs h-10 text-white"><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-zinc-900 border-zinc-800 text-white">
+                    <SelectItem value="All">All locations</SelectItem>
+                    {uniqueLocations.map(loc => (
+                      <SelectItem key={loc} value={loc}>{loc}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Religion */}
+              <div className="space-y-1">
+                <Label className="text-zinc-400 text-xs font-bold uppercase tracking-wider">Religion</Label>
+                <Select value={filterReligion} onValueChange={setFilterReligion}>
+                  <SelectTrigger className="w-full bg-zinc-900 border-zinc-800 text-xs h-10 text-white"><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-zinc-900 border-zinc-800 text-white">
+                    <SelectItem value="All">All religions</SelectItem>
+                    {uniqueReligions.map(rel => (
+                      <SelectItem key={rel} value={rel}>{rel}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Age Range */}
+              <div className="space-y-1">
+                <Label className="text-zinc-400 text-xs font-bold uppercase tracking-wider">Age Range</Label>
+                <div className="flex gap-2 items-center">
+                  <Input 
+                    type="number" 
+                    placeholder="Min" 
+                    className="bg-zinc-900 border-zinc-800 text-xs h-10 text-white p-2 flex-1" 
+                    value={minAge} 
+                    onChange={e => setMinAge(e.target.value)} 
+                  />
+                  <span className="text-zinc-600 text-xs">-</span>
+                  <Input 
+                    type="number" 
+                    placeholder="Max" 
+                    className="bg-zinc-900 border-zinc-800 text-xs h-10 text-white p-2 flex-1" 
+                    value={maxAge} 
+                    onChange={e => setMaxAge(e.target.value)} 
+                  />
+                </div>
+              </div>
+
+              {/* Height Range */}
+              <div className="space-y-1">
+                <Label className="text-zinc-400 text-xs font-bold uppercase tracking-wider">Height Range</Label>
+                <div className="flex gap-2 items-center">
+                  <Input 
+                    type="number" 
+                    step="0.01" 
+                    placeholder="Min m" 
+                    className="bg-zinc-900 border-zinc-800 text-xs h-10 text-white p-2 flex-1" 
+                    value={minHeight}
+                    onChange={e => setMinHeight(e.target.value)}
+                  />
+                  <span className="text-zinc-600 text-xs">-</span>
+                  <Input 
+                    type="number" 
+                    step="0.01" 
+                    placeholder="Max m" 
+                    className="bg-zinc-900 border-zinc-800 text-xs h-10 text-white p-2 flex-1" 
+                    value={maxHeight}
+                    onChange={e => maxHeightSet(e.target.value)}
+                  />
+                </div>
+              </div>
+
+              {/* Assigned Admin */}
+              <div className="space-y-1">
+                <Label className="text-zinc-400 text-xs font-bold uppercase tracking-wider">Assigned Admin</Label>
+                <Select value={filterAdmin} onValueChange={setFilterAdmin}>
+                  <SelectTrigger className="w-full bg-zinc-900 border-zinc-800 text-xs h-10 text-white"><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-zinc-950 border-zinc-800 text-white">
+                    <SelectItem value="All">All admins</SelectItem>
+                    {users.map(u => (
+                      <SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Sort By */}
+              <div className="space-y-1">
+                <Label className="text-zinc-400 text-xs font-bold uppercase tracking-wider">Sort by</Label>
+                <Select value={sortBy} onValueChange={setSortBy}>
+                  <SelectTrigger className="w-full bg-zinc-900 border-zinc-800 text-xs h-10 text-white"><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-zinc-950 border-zinc-800 text-white">
+                    <SelectItem value="newest">Newest profiles</SelectItem>
+                    <SelectItem value="age-asc">Age (Low → High)</SelectItem>
+                    <SelectItem value="age-desc">Age (High → Low)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <Button onClick={() => setIsMobileFilterOpen(false)} className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold h-11 rounded-xl">
+              Apply Filters
+            </Button>
+          </div>
+        </div>
+
         <Card className="bg-gradient-to-br from-zinc-900/30 via-zinc-950/10 to-zinc-900/30 backdrop-blur-lg border border-white/10 shadow-2xl rounded-2xl overflow-hidden shadow-black/50">
           <CardContent className="p-0">
             {selectedClientIds.length > 0 && isManagerOrAdmin && (
@@ -587,7 +984,10 @@ export default function Clients() {
               </div>
             )}
 
-            <Table>
+            
+            {/* Desktop Table View */}
+            <div className="hidden md:block">
+              <Table>
               <TableHeader className="bg-zinc-900/40">
                 <TableRow className="border-b border-white/5">
                   <TableHead className="w-[50px] py-4 px-6">
@@ -687,352 +1087,7 @@ export default function Clients() {
                                 View Profile
                               </Button>
                             </DialogTrigger>
-                            <DialogContent className="max-w-[1000px] w-[95vw] max-h-[90vh] overflow-hidden flex flex-col p-0 border border-white/10 bg-zinc-900/90 backdrop-blur-xl text-white shadow-2xl rounded-2xl shadow-black/80">
-                              <DialogHeader className="p-6 border-b border-white/5 bg-zinc-900/40 flex flex-row items-center justify-between">
-                                <div>
-                                  <DialogTitle className="text-2xl font-extrabold flex items-center gap-3">
-                                    Candidate Details: <span className="text-pink-400 font-black">{candidate.code || 'C-XXX'}</span>
-                                    {getStatusBadge(candidate.status)}
-                                  </DialogTitle>
-                                  <p className="text-xs text-zinc-400 mt-1">Full profile mapping for matchmaker audits.</p>
-                                </div>
-                                <div className="pr-8 flex items-center gap-3">
-                                  {!isRevealed && isManagerOrAdmin && (
-                                    <Button 
-                                      onClick={() => handleReveal(candidate.id)} 
-                                      className="bg-amber-600 hover:bg-amber-700 text-white border-none font-extrabold h-9 px-4 rounded-xl text-xs"
-                                    >
-                                      <Unlock className="h-3.5 w-3.5 mr-2" /> Reveal Sensitive Details
-                                    </Button>
-                                  )}
-                                  {isRevealed && (
-                                    <Badge className="bg-amber-500/20 text-amber-400 border border-amber-500/30 px-3 py-1 text-xs font-extrabold rounded-xl">
-                                      UNLOCKED ADMIN PRIVACY
-                                    </Badge>
-                                  )}
-                                </div>
-                              </DialogHeader>
-
-                              {/* Candidate Info Grid content */}
-                              <div className="flex-1 overflow-y-auto p-6 space-y-8 custom-scrollbar">
-                                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                                  {/* Left Bento: Primary Dating Fields */}
-                                  <div className="lg:col-span-2 space-y-6">
-                                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                      <Card className="bg-zinc-900/50 border-white/5 p-4 rounded-xl space-y-2">
-                                        <h4 className="text-xs font-black uppercase text-pink-400 tracking-wider flex items-center gap-2">
-                                          <Smile className="h-4 w-4" /> Personal Metrics
-                                        </h4>
-                                        <div className="space-y-1.5 text-xs text-zinc-300">
-                                          <div className="flex justify-between py-1 border-b border-white/5">
-                                            <span className="text-zinc-500">Gender:</span>
-                                            <span className="font-semibold text-white">{candidate.gender || 'Not specified'}</span>
-                                          </div>
-                                          <div className="flex justify-between py-1 border-b border-white/5">
-                                            <span className="text-zinc-500">Age:</span>
-                                            <span className="font-semibold text-white">{candidate.age || candidate.finalAge || 'N/A'}</span>
-                                          </div>
-                                          <div className="flex justify-between py-1 border-b border-white/5">
-                                            <span className="text-zinc-500">Height:</span>
-                                            <span className="font-semibold text-white">{candidate.height || 'Not specified'}</span>
-                                          </div>
-                                          <div className="flex justify-between py-1">
-                                            <span className="text-zinc-500">Residence:</span>
-                                            <span className="font-semibold text-white">{candidate.locationOfResidence || 'Not set'}</span>
-                                          </div>
-                                        </div>
-                                      </Card>
-
-                                      <Card className="bg-zinc-900/50 border-white/5 p-4 rounded-xl space-y-2">
-                                        <h4 className="text-xs font-black uppercase text-pink-400 tracking-wider flex items-center gap-2">
-                                          <BookOpen className="h-4 w-4" /> Education & Career
-                                        </h4>
-                                        <div className="space-y-1.5 text-xs text-zinc-300">
-                                          <div className="flex justify-between py-1 border-b border-white/5">
-                                            <span className="text-zinc-500">Is GUCIAN?</span>
-                                            <span className="font-semibold text-white">{candidate.areYouGucian || 'No'}</span>
-                                          </div>
-                                          <div className="flex justify-between py-1 border-b border-white/5">
-                                            <span className="text-zinc-500">GUC ID:</span>
-                                            <span className="font-mono text-white">{candidate.gucId || 'N/A'}</span>
-                                          </div>
-                                          <div className="flex justify-between py-1 border-b border-white/5">
-                                            <span className="text-zinc-500">Field of Study:</span>
-                                            <span className="font-semibold text-white truncate max-w-[120px]">{candidate.universityFieldOfStudy || 'N/A'}</span>
-                                          </div>
-                                          <div className="flex justify-between py-1">
-                                            <span className="text-zinc-500">Current Job:</span>
-                                            <span className="font-semibold text-white truncate max-w-[120px]">{candidate.currentJob || 'Not set'}</span>
-                                          </div>
-                                        </div>
-                                      </Card>
-
-                                      <Card className="bg-zinc-900/50 border-white/5 p-4 rounded-xl space-y-2">
-                                        <h4 className="text-xs font-black uppercase text-pink-400 tracking-wider flex items-center gap-2">
-                                          <Compass className="h-4 w-4" /> Faith & Values
-                                        </h4>
-                                        <div className="space-y-1.5 text-xs text-zinc-300">
-                                          <div className="flex justify-between py-1 border-b border-white/5">
-                                            <span className="text-zinc-500">Religion:</span>
-                                            <span className="font-semibold text-white">{candidate.religion || 'Not set'}</span>
-                                          </div>
-                                          <div className="flex justify-between py-1 border-b border-white/5">
-                                            <span className="text-zinc-500">Denomination:</span>
-                                            <span className="font-semibold text-white">{candidate.religiousDenomination || 'Not set'}</span>
-                                          </div>
-                                          <div className="flex justify-between py-1 border-b border-white/5">
-                                            <span className="text-zinc-500">Regular Prayer:</span>
-                                            <span className="font-semibold text-white">{candidate.prayRegularly || 'Not set'}</span>
-                                          </div>
-                                          <div className="flex justify-between py-1">
-                                            <span className="text-zinc-500">Hijab preference:</span>
-                                            <span className="font-semibold text-white">{candidate.hijabPreference || 'N/A'}</span>
-                                          </div>
-                                        </div>
-                                      </Card>
-
-                                      <Card className="bg-zinc-900/50 border-white/5 p-4 rounded-xl space-y-2">
-                                        <h4 className="text-xs font-black uppercase text-pink-400 tracking-wider flex items-center gap-2">
-                                          <Award className="h-4 w-4" /> Life Status
-                                        </h4>
-                                        <div className="space-y-1.5 text-xs text-zinc-300">
-                                          <div className="flex justify-between py-1 border-b border-white/5">
-                                            <span className="text-zinc-500">Marital Status:</span>
-                                            <span className="font-semibold text-white">{candidate.maritalStatus || 'Single'}</span>
-                                          </div>
-                                          <div className="flex justify-between py-1 border-b border-white/5">
-                                            <span className="text-zinc-500">Have Children:</span>
-                                            <span className="font-semibold text-white">{candidate.haveChildren || 'No'}</span>
-                                          </div>
-                                          <div className="flex justify-between py-1 border-b border-white/5">
-                                            <span className="text-zinc-500">Smoke / Drink:</span>
-                                            <span className="font-semibold text-white">{candidate.smokeOrDrink || 'No'}</span>
-                                          </div>
-                                          <div className="flex justify-between py-1">
-                                            <span className="text-zinc-500">Willing Relocate:</span>
-                                            <span className="font-semibold text-white">{candidate.willingToRelocate || 'No'}</span>
-                                          </div>
-                                        </div>
-                                      </Card>
-                                    </div>
-
-                                    {/* Self Introduction / Partner Preferences */}
-                                    <div className="space-y-4">
-                                      <div className="bg-zinc-900/30 p-4 rounded-xl border border-white/5">
-                                        <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Self Introduction</h4>
-                                        <p className="text-sm text-zinc-200 leading-relaxed italic bg-zinc-950/40 p-3 rounded-lg border border-white/5">
-                                          {candidate.selfIntroduction ? `"${candidate.selfIntroduction}"` : 'No introduction provided.'}
-                                        </p>
-                                      </div>
-
-                                      <div className="bg-zinc-900/30 p-4 rounded-xl border border-white/5">
-                                        <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-wider mb-2">Partner Preferences</h4>
-                                        <p className="text-sm text-zinc-200 leading-relaxed italic bg-zinc-950/40 p-3 rounded-lg border border-white/5">
-                                          {candidate.partnerPreferences ? `"${candidate.partnerPreferences}"` : 'No preference text provided.'}
-                                        </p>
-                                      </div>
-                                    </div>
-                                  </div>
-
-                                  {/* Right Bento: Contacts & Matchmaking Actions */}
-                                  <div className="space-y-6">
-                                    {/* Sensitive Contacts Panel */}
-                                    <Card className="bg-zinc-900/50 border-white/5 p-4 rounded-xl space-y-3">
-                                      <h4 className="text-xs font-black uppercase text-amber-400 tracking-wider flex items-center gap-2">
-                                        <Lock className="h-4 w-4" /> Sensitive Contacts
-                                      </h4>
-                                      <div className="space-y-2.5 text-xs">
-                                        {isRevealed && (
-                                          <div className="bg-amber-600/10 text-amber-300 p-2 rounded border border-amber-500/20 text-[10px] font-bold uppercase tracking-wider text-center">
-                                            Admin Session Reveal Active
-                                          </div>
-                                        )}
-                                        <div className="space-y-1">
-                                          <span className="text-zinc-500 font-semibold block">Full Name:</span>
-                                          <span className="font-bold text-white text-sm">{isRevealed ? rawProf.fullName || rawProf.name : '🔒 [Name Encrypted]'}</span>
-                                        </div>
-                                        <div className="space-y-1">
-                                          <span className="text-zinc-500 font-semibold block">Phone Number:</span>
-                                          <div className="flex items-center gap-2 text-white">
-                                            <Phone className="h-3.5 w-3.5 text-zinc-500" />
-                                            <span className="font-mono text-sm">{dispPhone}</span>
-                                          </div>
-                                        </div>
-                                        <div className="space-y-1">
-                                          <span className="text-zinc-500 font-semibold block">Email Address:</span>
-                                          <div className="flex items-center gap-2 text-white">
-                                            <Mail className="h-3.5 w-3.5 text-zinc-500" />
-                                            <span className="font-mono">{dispEmail}</span>
-                                          </div>
-                                        </div>
-                                        <div className="space-y-1">
-                                          <span className="text-zinc-500 font-semibold block">Facebook Link:</span>
-                                          <div className="flex items-center gap-2 text-white">
-                                            <Facebook className="h-3.5 w-3.5 text-zinc-500" />
-                                            <span>{dispFB}</span>
-                                          </div>
-                                        </div>
-                                      </div>
-                                    </Card>
-
-                                    {/* Status & Workload Updates */}
-                                    <Card className="bg-zinc-900/50 border-white/5 p-4 rounded-xl space-y-4">
-                                      <h4 className="text-xs font-black uppercase text-pink-400 tracking-wider flex items-center gap-2">
-                                        <Settings className="h-4 w-4" /> Admin Controls
-                                      </h4>
-                                      <div className="space-y-3">
-                                        <div className="space-y-1">
-                                          <Label className="text-zinc-400 text-xs">Profile Status</Label>
-                                          <select 
-                                            className="w-full bg-zinc-900 border-zinc-800 text-white rounded-lg h-9 text-xs p-1 focus:ring-pink-500"
-                                            value={candidate.status}
-                                            onChange={(e) => updateClient(candidate.id, { status: e.target.value as any })}
-                                          >
-                                            <option value="Pending">Pending review</option>
-                                            <option value="Approved">Approved</option>
-                                            <option value="Hold">Hold</option>
-                                            <option value="Rejected">Rejected</option>
-                                          </select>
-                                        </div>
-
-                                        <div className="space-y-1">
-                                          <Label className="text-zinc-400 text-xs">Assigned Matchmaker</Label>
-                                          <select 
-                                            className="w-full bg-zinc-900 border-zinc-800 text-white rounded-lg h-9 text-xs p-1 focus:ring-pink-500"
-                                            value={candidate.assignedTo || 'unassigned'}
-                                            onChange={(e) => updateClient(candidate.id, { assignedTo: e.target.value === 'unassigned' ? '' : e.target.value })}
-                                          >
-                                            <option value="unassigned">Unassigned</option>
-                                            {users.map(u => (
-                                              <option key={u.id} value={u.id}>{u.name}</option>
-                                            ))}
-                                          </select>
-                                        </div>
-
-                                        {isManagerOrAdmin && (
-                                          <Button 
-                                            variant="destructive" 
-                                            size="sm" 
-                                            className="w-full bg-rose-950/20 hover:bg-rose-950/40 text-rose-400 border border-rose-500/20 h-9 rounded-xl font-bold text-xs"
-                                            onClick={() => {
-                                              setProfileToDelete(candidate.id);
-                                              setIsDeleteDialogOpen(true);
-                                            }}
-                                          >
-                                            <Trash2 className="h-3.5 w-3.5 mr-2" /> Delete Candidate
-                                          </Button>
-                                        )}
-                                      </div>
-                                    </Card>
-                                  </div>
-                                </div>
-
-                                {/* Custom Comments & Interaction Logging Tab inside Sheet */}
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 pt-6 border-t border-white/5">
-                                  {/* Interactions Logs */}
-                                  <div className="space-y-4">
-                                    <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
-                                      <Activity className="h-4 w-4 text-pink-400" /> Log Matchmaker Call / Contact
-                                    </h3>
-                                    <div className="bg-zinc-900/30 p-4 rounded-xl border border-white/5 space-y-3">
-                                      <div className="grid grid-cols-2 gap-2">
-                                        <div className="space-y-1">
-                                          <Label className="text-zinc-500 text-[10px]">Type</Label>
-                                          <select 
-                                            className="w-full bg-zinc-900 border-zinc-800 text-white rounded h-8 text-xs p-1"
-                                            value={interactionType}
-                                            onChange={(e) => setInteractionType(e.target.value as any)}
-                                          >
-                                            <option value="Call">Call</option>
-                                            <option value="WhatsApp">WhatsApp</option>
-                                            <option value="Email">Email</option>
-                                            <option value="Visit">Visit</option>
-                                          </select>
-                                        </div>
-                                        <div className="space-y-1">
-                                          <Label className="text-zinc-500 text-[10px]">Outcome</Label>
-                                          <select 
-                                            className="w-full bg-zinc-900 border-zinc-800 text-white rounded h-8 text-xs p-1"
-                                            value={interactionOutcome}
-                                            onChange={(e) => setInteractionOutcome(e.target.value as any)}
-                                          >
-                                            <option value="Interested">Interested</option>
-                                            <option value="Not Answered">Not Answered</option>
-                                            <option value="Rejected">Rejected</option>
-                                            <option value="Other">Other</option>
-                                          </select>
-                                        </div>
-                                      </div>
-                                      <div className="space-y-1">
-                                        <Label className="text-zinc-500 text-[10px]">Notes</Label>
-                                        <Textarea 
-                                          placeholder="Enter brief interaction outcomes..." 
-                                          className="bg-zinc-900 border-zinc-800 text-xs min-h-[60px]"
-                                          value={interactionNotes}
-                                          onChange={(e) => setInteractionNotes(e.target.value)}
-                                        />
-                                      </div>
-                                      <Button onClick={() => handleAddInteraction(candidate.id)} className="w-full h-8 text-xs bg-pink-600 hover:bg-pink-700 text-white font-bold rounded-lg">
-                                        Log Contact
-                                      </Button>
-                                    </div>
-
-                                    {/* Interaction History List */}
-                                    <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
-                                      {candidate.interactions && candidate.interactions.length > 0 ? (
-                                        candidate.interactions.map(item => (
-                                          <div key={item.id} className="bg-zinc-900/50 p-3 rounded-lg border border-white/5 text-xs space-y-1">
-                                            <div className="flex justify-between text-zinc-500">
-                                              <span className="font-bold text-pink-400">{item.type} → {item.outcome}</span>
-                                              <span>{format(parseISO(item.date), 'MMM d, yyyy')}</span>
-                                            </div>
-                                            <p className="text-zinc-200 italic">"{item.notes}"</p>
-                                            <div className="text-[10px] text-zinc-600">Logged by: {item.author}</div>
-                                          </div>
-                                        ))
-                                      ) : (
-                                        <p className="text-xs text-zinc-600 italic text-center py-4">No logged contacts for this candidate.</p>
-                                      )}
-                                    </div>
-                                  </div>
-
-                                  {/* Comments section */}
-                                  <div className="space-y-4">
-                                    <h3 className="text-sm font-bold uppercase tracking-wider text-zinc-400 flex items-center gap-2">
-                                      <MessageSquare className="h-4 w-4 text-pink-400" /> Internal Matchmaker Notes
-                                    </h3>
-                                    <div className="bg-zinc-900/30 p-4 rounded-xl border border-white/5 space-y-2">
-                                      <Textarea 
-                                        placeholder="Add internal candidate comment/updates..." 
-                                        className="bg-zinc-900 border-zinc-800 text-xs min-h-[70px]"
-                                        value={newComment}
-                                        onChange={(e) => setNewComment(e.target.value)}
-                                      />
-                                      <Button onClick={() => handleAddComment(candidate.id)} className="w-full h-8 text-xs bg-zinc-800 hover:bg-zinc-700 text-white font-bold rounded-lg">
-                                        Save Comment
-                                      </Button>
-                                    </div>
-
-                                    {/* Comment History List */}
-                                    <div className="space-y-2 max-h-[250px] overflow-y-auto pr-2 custom-scrollbar">
-                                      {candidate.comments && candidate.comments.length > 0 ? (
-                                        candidate.comments.map(c => (
-                                          <div key={c.id} className="bg-zinc-900/50 p-3 rounded-lg border border-white/5 text-xs space-y-1">
-                                            <div className="flex justify-between text-zinc-500">
-                                              <span className="font-bold text-zinc-400">{c.author}</span>
-                                              <span>{format(parseISO(c.date), 'MMM d, yyyy')}</span>
-                                            </div>
-                                            <p className="text-zinc-200">{c.text}</p>
-                                          </div>
-                                        ))
-                                      ) : (
-                                        <p className="text-xs text-zinc-600 italic text-center py-4">No comments recorded.</p>
-                                      )}
-                                    </div>
-                                  </div>
-                                </div>
-                              </div>
-                            </DialogContent>
+                            {renderProfileDialogContent(candidate)}
                           </Dialog>
                         </div>
                       </TableCell>
@@ -1048,6 +1103,102 @@ export default function Clients() {
                 )}
               </TableBody>
             </Table>
+            </div>
+
+            {/* Mobile Card Grid View */}
+            <div className="block md:hidden p-4 space-y-4">
+              {filteredCandidates.map(candidate => {
+                const isRevealed = revealedClients[candidate.id] === true;
+                const rawProf = rawProfiles.find(rp => rp.id === candidate.id) || candidate;
+                
+                // Read unmasked contact if revealed
+                const dispPhone = isRevealed ? rawProf.phone || rawProf.phoneNumber : candidate.phone;
+                const dispEmail = isRevealed ? rawProf.email : maskEmail(candidate.email);
+
+                return (
+                  <Card key={candidate.id} className="bg-gradient-to-br from-zinc-900/50 to-zinc-950 border border-white/10 shadow-xl rounded-2xl overflow-hidden">
+                    <CardHeader className="pb-2 border-b border-white/5 bg-zinc-900/20 p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-extrabold text-white text-base tracking-wide">{candidate.code || candidate.memberId || 'C-XXX'}</span>
+                            {candidate.areYouGucian?.toLowerCase().includes('yes') && (
+                              <Badge className="bg-pink-500 text-white border-none text-[8px] font-black tracking-widest px-1 py-0 h-4">GUC</Badge>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-semibold">
+                            <MapPin className="h-3 w-3 text-zinc-500" />
+                            <span>{candidate.locationOfResidence || 'Not set'}</span>
+                          </div>
+                        </div>
+                        {getStatusBadge(candidate.status)}
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-4 space-y-3.5 text-xs text-zinc-300">
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="bg-zinc-900/30 p-2 rounded-lg border border-white/5">
+                          <span className="text-zinc-500 block text-[9px] uppercase font-bold">Age</span>
+                          <span className="font-semibold text-white">{candidate.age || candidate.finalAge || 'N/A'}</span>
+                        </div>
+                        <div className="bg-zinc-900/30 p-2 rounded-lg border border-white/5">
+                          <span className="text-zinc-500 block text-[9px] uppercase font-bold">Religion</span>
+                          <span className="font-semibold text-white">{candidate.religion || 'Not set'}</span>
+                        </div>
+                      </div>
+
+                      {/* Basic Contact Preview */}
+                      <div className="space-y-1.5 bg-zinc-950/40 p-2.5 rounded-lg border border-white/5">
+                        <div className="flex items-center justify-between text-zinc-400">
+                          <div className="flex items-center gap-1.5">
+                            <Phone className="h-3 w-3 text-zinc-500" />
+                            <span className="font-mono text-[11px]">{dispPhone}</span>
+                          </div>
+                          {!isRevealed && isManagerOrAdmin && (
+                            <Button 
+                              variant="ghost" 
+                              size="xs" 
+                              onClick={() => handleReveal(candidate.id)} 
+                              className="h-5 text-amber-500 hover:text-amber-400 p-0 text-[10px] font-bold"
+                            >
+                              Reveal
+                            </Button>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 text-zinc-500">
+                          <Mail className="h-3 w-3 text-zinc-600" />
+                          <span className="truncate max-w-[190px]">{dispEmail}</span>
+                        </div>
+                      </div>
+
+                      {/* Rep Assigned */}
+                      <div className="flex justify-between items-center text-[10px] text-zinc-500 pt-2 border-t border-white/5">
+                        <span>Assigned Rep:</span>
+                        <Badge variant="outline" className="border-white/5 text-zinc-400 text-[9px] font-medium bg-zinc-900/30">
+                          {users.find(u => u.id === candidate.assignedTo)?.name || 'Unassigned'}
+                        </Badge>
+                      </div>
+
+                      {/* Actions Trigger */}
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button className="w-full mt-2 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-extrabold h-9 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-pink-900/20">
+                            View Profile Details
+                          </Button>
+                        </DialogTrigger>
+                        {renderProfileDialogContent(candidate)}
+                      </Dialog>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+              
+              {filteredCandidates.length === 0 && (
+                <div className="text-center py-16 text-zinc-500 italic text-sm">
+                  No candidate profiles found matching your search.
+                </div>
+              )}
+            </div>
+
           </CardContent>
         </Card>
       </Tabs>

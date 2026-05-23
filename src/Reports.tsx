@@ -215,55 +215,55 @@ export default function Reports() {
       </div>
 
       {/* Grid KPI Cards */}
-      <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
-        <Card className="bg-gradient-to-br from-zinc-900/40 via-zinc-950/20 to-zinc-900/40 backdrop-blur-lg border border-white/10 shadow-2xl p-6 rounded-2xl flex flex-col justify-between shadow-black/40">
-          <div className="space-y-2">
-            <span className="text-zinc-400 text-xs font-black uppercase tracking-wider block">Total Registered Candidates</span>
-            <span className="text-4xl font-black text-white">{candidateFunnel.total}</span>
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-6">
+        <Card className="bg-gradient-to-br from-zinc-900/40 via-zinc-950/20 to-zinc-900/40 backdrop-blur-lg border border-white/10 shadow-2xl p-4 sm:p-6 rounded-2xl flex flex-col justify-between shadow-black/40 hover:scale-[1.03] active:scale-[0.98] transition-all duration-300">
+          <div className="space-y-1 sm:space-y-2">
+            <span className="text-zinc-400 text-[10px] sm:text-xs font-black uppercase tracking-wider block leading-tight">Total Candidates</span>
+            <span className="text-2xl sm:text-4xl font-black text-white">{candidateFunnel.total}</span>
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-bold mt-4">
-            <UserCheck className="h-4 w-4" />
-            <span>Active candidates database</span>
-          </div>
-        </Card>
-
-        <Card className="bg-gradient-to-br from-zinc-900/40 via-zinc-950/20 to-zinc-900/40 backdrop-blur-lg border border-white/10 shadow-2xl p-6 rounded-2xl flex flex-col justify-between shadow-black/40">
-          <div className="space-y-2">
-            <span className="text-zinc-400 text-xs font-black uppercase tracking-wider block">Active Matches Proposed</span>
-            <span className="text-4xl font-black text-indigo-400">{matchSuccessMetrics.activeProposed}</span>
-          </div>
-          <div className="flex items-center gap-1.5 text-xs text-indigo-400 font-bold mt-4">
-            <Activity className="h-4 w-4" />
-            <span>Total match proposals initiated</span>
+          <div className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs text-emerald-400 font-bold mt-3 sm:mt-4 truncate">
+            <UserCheck className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <span className="truncate">Active database</span>
           </div>
         </Card>
 
-        <Card className="bg-gradient-to-br from-zinc-900/40 via-zinc-950/20 to-zinc-900/40 backdrop-blur-lg border border-white/10 shadow-2xl p-6 rounded-2xl flex flex-col justify-between shadow-black/40">
-          <div className="space-y-2">
-            <span className="text-zinc-400 text-xs font-black uppercase tracking-wider block">Photo Swaps Completed</span>
-            <span className="text-4xl font-black text-pink-400">{matchSuccessMetrics.photoSwapsCompleted}</span>
+        <Card className="bg-gradient-to-br from-zinc-900/40 via-zinc-950/20 to-zinc-900/40 backdrop-blur-lg border border-white/10 shadow-2xl p-4 sm:p-6 rounded-2xl flex flex-col justify-between shadow-black/40 hover:scale-[1.03] active:scale-[0.98] transition-all duration-300">
+          <div className="space-y-1 sm:space-y-2">
+            <span className="text-zinc-400 text-[10px] sm:text-xs font-black uppercase tracking-wider block leading-tight">Active Matches</span>
+            <span className="text-2xl sm:text-4xl font-black text-indigo-400">{matchSuccessMetrics.activeProposed}</span>
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-pink-400 font-bold mt-4">
-            <Sparkles className="h-4 w-4" />
-            <span>Mutual photo approvals</span>
+          <div className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs text-indigo-400 font-bold mt-3 sm:mt-4 truncate">
+            <Activity className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <span className="truncate">Active proposals</span>
           </div>
         </Card>
 
-        <Card className="bg-gradient-to-br from-zinc-900/40 via-zinc-950/20 to-zinc-900/40 backdrop-blur-lg border border-white/10 shadow-2xl p-6 rounded-2xl flex flex-col justify-between shadow-black/40">
-          <div className="space-y-2">
-            <span className="text-zinc-400 text-xs font-black uppercase tracking-wider block">Contact Details Shared</span>
-            <span className="text-4xl font-black text-emerald-400">{matchSuccessMetrics.contactDetailsShared}</span>
+        <Card className="bg-gradient-to-br from-zinc-900/40 via-zinc-950/20 to-zinc-900/40 backdrop-blur-lg border border-white/10 shadow-2xl p-4 sm:p-6 rounded-2xl flex flex-col justify-between shadow-black/40 hover:scale-[1.03] active:scale-[0.98] transition-all duration-300">
+          <div className="space-y-1 sm:space-y-2">
+            <span className="text-zinc-400 text-[10px] sm:text-xs font-black uppercase tracking-wider block leading-tight">Photo Swaps</span>
+            <span className="text-2xl sm:text-4xl font-black text-pink-400">{matchSuccessMetrics.photoSwapsCompleted}</span>
           </div>
-          <div className="flex items-center gap-1.5 text-xs text-emerald-400 font-bold mt-4">
-            <Heart className="h-4 w-4 fill-emerald-500/20" />
-            <span>Successful match connections</span>
+          <div className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs text-pink-400 font-bold mt-3 sm:mt-4 truncate">
+            <Sparkles className="h-3.5 w-3.5 sm:h-4 sm:w-4" />
+            <span className="truncate">Mutual approvals</span>
+          </div>
+        </Card>
+
+        <Card className="bg-gradient-to-br from-zinc-900/40 via-zinc-950/20 to-zinc-900/40 backdrop-blur-lg border border-white/10 shadow-2xl p-4 sm:p-6 rounded-2xl flex flex-col justify-between shadow-black/40 hover:scale-[1.03] active:scale-[0.98] transition-all duration-300">
+          <div className="space-y-1 sm:space-y-2">
+            <span className="text-zinc-400 text-[10px] sm:text-xs font-black uppercase tracking-wider block leading-tight">Details Shared</span>
+            <span className="text-2xl sm:text-4xl font-black text-emerald-400">{matchSuccessMetrics.contactDetailsShared}</span>
+          </div>
+          <div className="flex items-center gap-1 sm:gap-1.5 text-[10px] sm:text-xs text-emerald-400 font-bold mt-3 sm:mt-4 truncate">
+            <Heart className="h-3.5 w-3.5 sm:h-4 sm:w-4 fill-emerald-500/20" />
+            <span className="truncate">Success couple</span>
           </div>
         </Card>
       </div>
 
       <div className="grid gap-6 md:grid-cols-2">
         {/* Candidate Status Funnel table */}
-        <Card className="bg-gradient-to-br from-zinc-900/35 via-zinc-950/15 to-zinc-900/35 backdrop-blur-lg border border-white/10 shadow-2xl rounded-2xl shadow-black/50">
+        <Card className="bg-gradient-to-br from-zinc-900/35 via-zinc-950/15 to-zinc-900/35 backdrop-blur-lg border border-white/10 shadow-2xl rounded-2xl shadow-black/50 overflow-hidden hover:scale-[1.01] transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div>
               <CardTitle className="text-lg font-bold flex items-center gap-2">
@@ -272,36 +272,38 @@ export default function Reports() {
               </CardTitle>
               <CardDescription className="text-zinc-400 text-xs mt-1">Breakdown of registered matchmaking candidates by their review status.</CardDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={handleExportCandidates} className="border-white/10 hover:bg-zinc-900 text-white text-xs">
+            <Button variant="outline" size="sm" onClick={handleExportCandidates} className="border-white/10 hover:bg-zinc-900 text-white text-xs active:scale-95 transition-all duration-150">
               <Download className="h-4 w-4 mr-2" /> Export
             </Button>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow className="border-b border-white/5">
-                  <TableHead className="text-zinc-400 font-bold text-xs uppercase">Review Stage</TableHead>
-                  <TableHead className="text-zinc-400 font-bold text-xs uppercase text-right">Candidates</TableHead>
-                  <TableHead className="text-zinc-400 font-bold text-xs uppercase text-right">Ratio</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {funnelTableData.map(row => (
-                  <TableRow key={row.Stage} className="border-b border-white/5">
-                    <TableCell className="font-semibold text-white">{row.Stage}</TableCell>
-                    <TableCell className="text-right font-bold text-zinc-200">{row.Count}</TableCell>
-                    <TableCell className="text-right">
-                      <Badge className="bg-indigo-600 text-white font-bold">{row.Percentage}</Badge>
-                    </TableCell>
+            <div className="overflow-x-auto w-full scrollbar-thin">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-b border-white/5">
+                    <TableHead className="text-zinc-400 font-bold text-xs uppercase">Review Stage</TableHead>
+                    <TableHead className="text-zinc-400 font-bold text-xs uppercase text-right">Candidates</TableHead>
+                    <TableHead className="text-zinc-400 font-bold text-xs uppercase text-right">Ratio</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {funnelTableData.map(row => (
+                    <TableRow key={row.Stage} className="border-b border-white/5 hover:bg-white/5 transition-colors duration-150">
+                      <TableCell className="font-semibold text-white">{row.Stage}</TableCell>
+                      <TableCell className="text-right font-bold text-zinc-200">{row.Count}</TableCell>
+                      <TableCell className="text-right">
+                        <Badge className="bg-indigo-600 text-white font-bold">{row.Percentage}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
 
         {/* Proposals Pipeline funnel */}
-        <Card className="bg-gradient-to-br from-zinc-900/35 via-zinc-950/15 to-zinc-900/35 backdrop-blur-lg border border-white/10 shadow-2xl rounded-2xl shadow-black/50">
+        <Card className="bg-gradient-to-br from-zinc-900/35 via-zinc-950/15 to-zinc-900/35 backdrop-blur-lg border border-white/10 shadow-2xl rounded-2xl shadow-black/50 overflow-hidden hover:scale-[1.01] transition-all duration-300">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
             <div>
               <CardTitle className="text-lg font-bold flex items-center gap-2">
@@ -310,37 +312,39 @@ export default function Reports() {
               </CardTitle>
               <CardDescription className="text-zinc-400 text-xs mt-1">Current state of match proposal couples across the Kanban review columns.</CardDescription>
             </div>
-            <Button variant="outline" size="sm" onClick={handleExportMatches} className="border-white/10 hover:bg-zinc-900 text-white text-xs">
+            <Button variant="outline" size="sm" onClick={handleExportMatches} className="border-white/10 hover:bg-zinc-900 text-white text-xs active:scale-95 transition-all duration-150">
               <Download className="h-4 w-4 mr-2" /> Export
             </Button>
           </CardHeader>
           <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow className="border-b border-white/5">
-                  <TableHead className="text-zinc-400 font-bold text-xs uppercase">Kanban Column</TableHead>
-                  <TableHead className="text-zinc-400 font-bold text-xs uppercase text-right">Proposals</TableHead>
-                  <TableHead className="text-zinc-400 font-bold text-xs uppercase text-right">Ratio</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {matchPipelineTableData.map(row => (
-                  <TableRow key={row.Column} className="border-b border-white/5">
-                    <TableCell className="font-semibold text-white">{row.Column}</TableCell>
-                    <TableCell className="text-right font-bold text-zinc-200">{row.ActiveProposals}</TableCell>
-                    <TableCell className="text-right">
-                      <Badge className="bg-pink-600 text-white font-bold">{row.Ratio}</Badge>
-                    </TableCell>
+            <div className="overflow-x-auto w-full scrollbar-thin">
+              <Table>
+                <TableHeader>
+                  <TableRow className="border-b border-white/5">
+                    <TableHead className="text-zinc-400 font-bold text-xs uppercase">Kanban Column</TableHead>
+                    <TableHead className="text-zinc-400 font-bold text-xs uppercase text-right">Proposals</TableHead>
+                    <TableHead className="text-zinc-400 font-bold text-xs uppercase text-right">Ratio</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
+                </TableHeader>
+                <TableBody>
+                  {matchPipelineTableData.map(row => (
+                    <TableRow key={row.Column} className="border-b border-white/5 hover:bg-white/5 transition-colors duration-150">
+                      <TableCell className="font-semibold text-white">{row.Column}</TableCell>
+                      <TableCell className="text-right font-bold text-zinc-200">{row.ActiveProposals}</TableCell>
+                      <TableCell className="text-right">
+                        <Badge className="bg-pink-600 text-white font-bold">{row.Ratio}</Badge>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </CardContent>
         </Card>
       </div>
 
       {/* Matchmaker workload and capacity analysis */}
-      <Card className="bg-gradient-to-br from-zinc-900/35 via-zinc-950/15 to-zinc-900/35 backdrop-blur-lg border border-white/10 shadow-2xl rounded-2xl shadow-black/50">
+      <Card className="bg-gradient-to-br from-zinc-900/35 via-zinc-950/15 to-zinc-900/35 backdrop-blur-lg border border-white/10 shadow-2xl rounded-2xl shadow-black/50 overflow-hidden hover:scale-[1.01] transition-all duration-300">
         <CardHeader>
           <CardTitle className="text-lg font-bold flex items-center gap-2">
             <Users className="h-5 w-5 text-purple-400" />
@@ -351,36 +355,38 @@ export default function Reports() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <Table>
-            <TableHeader>
-              <TableRow className="border-b border-white/5">
-                <TableHead className="text-zinc-400 font-bold text-xs uppercase">Matchmaker Name</TableHead>
-                <TableHead className="text-zinc-400 font-bold text-xs uppercase">System Role</TableHead>
-                <TableHead className="text-zinc-400 font-bold text-xs uppercase text-right">Candidates Managed</TableHead>
-                <TableHead className="text-zinc-400 font-bold text-xs uppercase text-right">Proposals Managed</TableHead>
-                <TableHead className="text-zinc-400 font-bold text-xs uppercase text-right">Capacity Weight Score</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {matchmakerWorkload.map(row => (
-                <TableRow key={row.Matchmaker} className="border-b border-white/5 hover:bg-zinc-900/10">
-                  <TableCell className="font-semibold text-white">{row.Matchmaker}</TableCell>
-                  <TableCell className="text-xs">
-                    <Badge variant="outline" className="border-zinc-800 text-zinc-400 uppercase font-semibold">
-                      {row.Role}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-right font-bold text-zinc-300">{row['Candidates Managed']}</TableCell>
-                  <TableCell className="text-right font-bold text-zinc-300">{row['Match Proposals Managed']}</TableCell>
-                  <TableCell className="text-right">
-                    <Badge className={row['Total Workload Score'] > 10 ? 'bg-amber-600 text-white font-bold' : 'bg-emerald-600 text-white font-bold'}>
-                      {row['Total Workload Score']} pts
-                    </Badge>
-                  </TableCell>
+          <div className="overflow-x-auto w-full scrollbar-thin">
+            <Table>
+              <TableHeader>
+                <TableRow className="border-b border-white/5">
+                  <TableHead className="text-zinc-400 font-bold text-xs uppercase">Matchmaker Name</TableHead>
+                  <TableHead className="text-zinc-400 font-bold text-xs uppercase">System Role</TableHead>
+                  <TableHead className="text-zinc-400 font-bold text-xs uppercase text-right">Candidates Managed</TableHead>
+                  <TableHead className="text-zinc-400 font-bold text-xs uppercase text-right">Proposals Managed</TableHead>
+                  <TableHead className="text-zinc-400 font-bold text-xs uppercase text-right">Capacity Weight Score</TableHead>
                 </TableRow>
-              ))}
-            </TableBody>
-          </Table>
+              </TableHeader>
+              <TableBody>
+                {matchmakerWorkload.map(row => (
+                  <TableRow key={row.Matchmaker} className="border-b border-white/5 hover:bg-white/5 transition-colors duration-150">
+                    <TableCell className="font-semibold text-white">{row.Matchmaker}</TableCell>
+                    <TableCell className="text-xs">
+                      <Badge variant="outline" className="border-zinc-800 text-zinc-400 uppercase font-semibold">
+                        {row.Role}
+                      </Badge>
+                    </TableCell>
+                    <TableCell className="text-right font-bold text-zinc-300">{row['Candidates Managed']}</TableCell>
+                    <TableCell className="text-right font-bold text-zinc-300">{row['Match Proposals Managed']}</TableCell>
+                    <TableCell className="text-right">
+                      <Badge className={row['Total Workload Score'] > 10 ? 'bg-amber-600 text-white font-bold' : 'bg-emerald-600 text-white font-bold'}>
+                        {row['Total Workload Score']} pts
+                      </Badge>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
         </CardContent>
       </Card>
     </div>

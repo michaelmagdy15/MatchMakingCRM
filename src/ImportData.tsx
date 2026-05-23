@@ -8,16 +8,20 @@ import { FileSpreadsheet, Link as LinkIcon, Loader2, Upload, CheckCircle2, Alert
 import Papa from 'papaparse';
 import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Client } from './types';
+import { Client, MatchStatus } from './types';
 import { Input } from '@/components/ui/input';
 
 interface ImportDataProps {
-  type?: 'Lead' | 'Active';
+  type?: 'Lead' | 'Active' | 'Match';
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-export default function ImportData({ type = 'Lead' }: ImportDataProps) {
-  const { bulkAddClients, currentUser, addImportBatch, rawClients } = useAppContext();
-  const [isOpen, setIsOpen] = useState(false);
+export default function ImportData({ type = 'Lead', isOpen: controlledIsOpen, onOpenChange: controlledOnOpenChange }: ImportDataProps) {
+  const { bulkAddClients, currentUser, addImportBatch, rawClients, matches, addMatch } = useAppContext();
+  const [localIsOpen, setLocalIsOpen] = useState(false);
+  const isOpen = controlledIsOpen !== undefined ? controlledIsOpen : localIsOpen;
+  const setIsOpen = controlledOnOpenChange !== undefined ? controlledOnOpenChange : setLocalIsOpen;
   const [file, setFile] = useState<File | null>(null);
   const [headers, setHeaders] = useState<string[]>([]);
   const [data, setData] = useState<any[]>([]);
@@ -30,7 +34,11 @@ export default function ImportData({ type = 'Lead' }: ImportDataProps) {
   const [importStats, setImportStats] = useState({ success: 0, failed: 0, errors: [] as {row: number, reason: string}[] });
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const fields = [
+  const fields = type === 'Match' ? [
+    { key: 'gentlemanCode', label: 'Gentleman Code (Required)', required: true },
+    { key: 'ladyCode', label: 'Lady Code (Required)', required: true },
+    { key: 'notes', label: 'Notes' }
+  ] : [
     { key: 'fullName', label: 'Full Name (Required)', required: true },
     { key: 'phoneNumber', label: 'Phone Number (Required)', required: true },
     { key: 'gender', label: 'Gender (Required)', required: true },
@@ -123,7 +131,11 @@ export default function ImportData({ type = 'Lead' }: ImportDataProps) {
     setData(results.data);
     
     const newMapping: Record<string, string> = {};
-    const fieldAliases: Record<string, string[]> = {
+    const fieldAliases: Record<string, string[]> = type === 'Match' ? {
+      gentlemanCode: ['gentleman code', 'gentlemancode', 'male code', 'malecode', 'gentleman', 'male', 'g code', 'gcode', 'كود الرجل'],
+      ladyCode: ['lady code', 'ladycode', 'female code', 'femalecode', 'lady', 'female', 'l code', 'lcode', 'كود المرأة'],
+      notes: ['notes', 'note', 'comment', 'comments', 'feedback', 'ملاحظات']
+    } : {
       fullName: ['full name', 'name', 'fullname', 'client', 'customer', 'candidate', 'profile', 'member', 'lead', 'اسم', 'الاسم'],
       phoneNumber: ['phone number', 'phone', 'mobile', 'number', 'tel', 'contact', 'whatsapp', 'رقم', 'تليفون'],
       gender: ['gender', 'sex', 'النوع', 'الجنس'],
@@ -210,7 +222,11 @@ export default function ImportData({ type = 'Lead' }: ImportDataProps) {
 
           const parsedHeaders = results.meta.fields || [];
           const newMapping: Record<string, string> = {};
-          const fieldAliases: Record<string, string[]> = {
+          const fieldAliases: Record<string, string[]> = type === 'Match' ? {
+            gentlemanCode: ['gentleman code', 'gentlemancode', 'male code', 'malecode', 'gentleman', 'male', 'g code', 'gcode', 'كود الرجل'],
+            ladyCode: ['lady code', 'ladycode', 'female code', 'femalecode', 'lady', 'female', 'l code', 'lcode', 'كود المرأة'],
+            notes: ['notes', 'note', 'comment', 'comments', 'feedback', 'ملاحظات']
+          } : {
             fullName: ['full name', 'name', 'fullname', 'client', 'customer', 'candidate', 'profile', 'member', 'lead', 'اسم', 'الاسم'],
             phoneNumber: ['phone number', 'phone', 'mobile', 'number', 'tel', 'contact', 'whatsapp', 'رقم', 'تليفون'],
             gender: ['gender', 'sex', 'النوع', 'الجنس'],
@@ -252,18 +268,31 @@ export default function ImportData({ type = 'Lead' }: ImportDataProps) {
             if (!match) match = parsedHeaders.find(h => aliases.some(alias => h.toLowerCase().includes(alias)));
             if (match) newMapping[field.key] = match;
           });
+          const hasGentleman = newMapping['gentlemanCode'];
+          const hasLady = newMapping['ladyCode'];
 
-          const hasName = newMapping['fullName'] || newMapping['name'];
-          const hasPhone = newMapping['phoneNumber'] || newMapping['phone'];
-          const hasGender = newMapping['gender'];
+          if (type === 'Match') {
+            if (!hasGentleman || !hasLady) {
+              setHeaders(parsedHeaders);
+              setData(results.data);
+              setMapping(newMapping);
+              setStep('map');
+              setIsLoading(false);
+              return;
+            }
+          } else {
+            const hasName = newMapping['fullName'] || newMapping['name'];
+            const hasPhone = newMapping['phoneNumber'] || newMapping['phone'];
+            const hasGender = newMapping['gender'];
 
-          if (!hasName || !hasPhone || !hasGender) {
-            setHeaders(parsedHeaders);
-            setData(results.data);
-            setMapping(newMapping);
-            setStep('map');
-            setIsLoading(false);
-            return;
+            if (!hasName || !hasPhone || !hasGender) {
+              setHeaders(parsedHeaders);
+              setData(results.data);
+              setMapping(newMapping);
+              setStep('map');
+              setIsLoading(false);
+              return;
+            }
           }
 
           setData(results.data);
@@ -281,6 +310,110 @@ export default function ImportData({ type = 'Lead' }: ImportDataProps) {
     setStep('importing');
     setProgress(0);
     setImportStats({ success: 0, failed: 0, errors: [] });
+
+    if (type === 'Match') {
+      const errors: { row: number; reason: string }[] = [];
+      let successCount = 0;
+      let failedCount = 0;
+
+      for (let i = 0; i < importData.length; i++) {
+        const row = importData[i];
+        try {
+          const gentlemanCol = importMapping['gentlemanCode'];
+          const ladyCol = importMapping['ladyCode'];
+
+          if (!gentlemanCol || !ladyCol) {
+            failedCount++;
+            errors.push({ row: i + 1, reason: 'Gentleman Code and Lady Code columns must be mapped.' });
+            continue;
+          }
+
+          const gentlemanCode = (row[gentlemanCol] || '').toString().trim();
+          const ladyCode = (row[ladyCol] || '').toString().trim();
+
+          if (!gentlemanCode || !ladyCode) {
+            failedCount++;
+            errors.push({ row: i + 1, reason: 'Missing Gentleman Code or Lady Code in row.' });
+            continue;
+          }
+
+          // Search gentleman in rawClients
+          const gentleman = rawClients.find(c => 
+            c.gender === 'Male' && 
+            (c.code?.toLowerCase() === gentlemanCode.toLowerCase() || 
+             c.memberId?.toLowerCase() === gentlemanCode.toLowerCase())
+          );
+
+          // Search lady in rawClients
+          const lady = rawClients.find(c => 
+            c.gender === 'Female' && 
+            (c.code?.toLowerCase() === ladyCode.toLowerCase() || 
+             c.memberId?.toLowerCase() === ladyCode.toLowerCase())
+          );
+
+          if (!gentleman) {
+            failedCount++;
+            errors.push({ row: i + 1, reason: `Gentleman with code "${gentlemanCode}" not found.` });
+            continue;
+          }
+
+          if (!lady) {
+            failedCount++;
+            errors.push({ row: i + 1, reason: `Lady with code "${ladyCode}" not found.` });
+            continue;
+          }
+
+          // Check if match already exists and is not pending feedback
+          const matchExists = matches.some(m => 
+            m.maleId === gentleman.id && 
+            m.femaleId === lady.id && 
+            m.status !== MatchStatus.PENDING_FEEDBACK
+          );
+
+          if (matchExists) {
+            failedCount++;
+            errors.push({ row: i + 1, reason: `An active match already exists between Gentleman "${gentlemanCode}" and Lady "${ladyCode}".` });
+            continue;
+          }
+
+          // Notes
+          const notesCol = importMapping['notes'];
+          const notes = notesCol ? (row[notesCol] || '').toString().trim() : '';
+
+          // Add match
+          await addMatch({
+            maleId: gentleman.id,
+            maleName: gentleman.name,
+            gentlemanCode: gentleman.code || gentleman.memberId,
+            femaleId: lady.id,
+            femaleName: lady.name,
+            ladyCode: lady.code || lady.memberId,
+            status: MatchStatus.MATCH_ACTIVE,
+            maleProfileApproved: true,
+            malePhotoApproved: true,
+            maleContactApproved: true,
+            femaleProfileApproved: true,
+            femalePhotoApproved: true,
+            femaleContactApproved: true,
+            notes: notes
+          });
+
+          successCount++;
+        } catch (err) {
+          failedCount++;
+          errors.push({ row: i + 1, reason: err instanceof Error ? err.message : 'Unknown error occurred.' });
+        }
+      }
+
+      setProgress(100);
+      setImportStats({ 
+        success: successCount, 
+        failed: failedCount, 
+        errors: errors 
+      });
+      setStep('confirm');
+      return;
+    }
     
     const now = new Date();
     const batchId = await addImportBatch({
@@ -471,24 +604,27 @@ export default function ImportData({ type = 'Lead' }: ImportDataProps) {
     setIsOpen(false);
   };
 
-  const isManualMapDisabled = 
-    (!mapping['fullName'] && !mapping['name']) || 
-    (!mapping['phoneNumber'] && !mapping['phone']) || 
-    !mapping['gender'];
+  const isManualMapDisabled = type === 'Match'
+    ? (!mapping['gentlemanCode'] || !mapping['ladyCode'])
+    : ((!mapping['fullName'] && !mapping['name']) || 
+       (!mapping['phoneNumber'] && !mapping['phone']) || 
+       !mapping['gender']);
 
   return (
     <Dialog open={isOpen} onOpenChange={setIsOpen}>
-      <DialogTrigger
-        render={
-          <Button variant="outline" size="sm">
-            <FileSpreadsheet className="mr-2 h-4 w-4" />
-            Import {type === 'Active' ? 'Active Candidates' : 'Lead Candidates'}
-          </Button>
-        }
-      />
+      {controlledIsOpen === undefined && (
+        <DialogTrigger
+          render={
+            <Button variant="outline" size="sm">
+              <FileSpreadsheet className="mr-2 h-4 w-4" />
+              Import {type === 'Match' ? 'Old Matches' : type === 'Active' ? 'Active Candidates' : 'Lead Candidates'}
+            </Button>
+          }
+        />
+      )}
       <DialogContent className="max-w-xl">
         <DialogHeader>
-          <DialogTitle>Import {type === 'Active' ? 'Active Candidates' : 'Lead Candidates'} from CSV / Google Sheets</DialogTitle>
+          <DialogTitle>Import {type === 'Match' ? 'Old Matches' : type === 'Active' ? 'Active Candidates' : 'Lead Candidates'} from CSV / Google Sheets</DialogTitle>
         </DialogHeader>
 
         {step === 'upload' && (
@@ -623,8 +759,8 @@ export default function ImportData({ type = 'Lead' }: ImportDataProps) {
             <div className="text-center">
               <p className="font-medium text-xl">Import Complete!</p>
               <p className="text-sm text-muted-foreground">
-                Successfully imported {importStats.success} matchmaking profiles.
-                {importStats.failed > 0 && ` Failed to import ${importStats.failed} profiles.`}
+                Successfully imported {importStats.success} {type === 'Match' ? 'match records' : 'matchmaking profiles'}.
+                {importStats.failed > 0 && ` Failed to import ${importStats.failed} records.`}
               </p>
             </div>
             

@@ -628,16 +628,36 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // CRUD Operations: MATCHES
   const addMatch = async (match: Omit<Match, 'id' | 'createdAt' | 'updatedAt'>) => {
     const newId = Math.random().toString(36).substr(2, 9);
-    const newMatch: Match = {
+    let newMatch: Match = {
       ...match,
       id: newId,
+      responsibleAdminId: match.responsibleAdminId || currentUser?.id || 'admin-sarah',
+      responsibleAdminName: match.responsibleAdminName || currentUser?.name || 'Sarah',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString()
     };
 
     if (isSupabaseConfigured && supabase) {
-      const { error } = await supabase.from('matches').insert(camelToSnake(newMatch));
+      const dbMatch = camelToSnake(newMatch);
+      // Remove these fields so the database triggers handle it securely on the server-side
+      delete dbMatch.responsible_admin_id;
+      delete dbMatch.responsible_admin_name;
+
+      const { data, error } = await supabase
+        .from('matches')
+        .insert(dbMatch)
+        .select('*')
+        .single();
       if (error) throw error;
+
+      if (data) {
+        const savedMatch = snakeToCamel(data) as Match;
+        newMatch = {
+          ...newMatch,
+          responsibleAdminId: savedMatch.responsibleAdminId,
+          responsibleAdminName: savedMatch.responsibleAdminName
+        };
+      }
     } else {
       const currentList = [...baseMatches, newMatch];
       localStorage.setItem(STORAGE_KEYS.MATCHES, JSON.stringify(currentList));

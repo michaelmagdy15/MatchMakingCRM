@@ -100,7 +100,7 @@ CREATE TABLE IF NOT EXISTS matches (
   responsible_admin_name VARCHAR(255),
   notes TEXT,
   
-  -- Sequential checkups
+  -- Sequential progress checks
   first_check VARCHAR(100) DEFAULT 'Pending',
   second_check VARCHAR(100) DEFAULT 'Pending',
   third_check VARCHAR(100) DEFAULT 'Pending',
@@ -175,6 +175,31 @@ ON matches FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
 
 CREATE TRIGGER update_tasks_updated_at BEFORE UPDATE
 ON tasks FOR EACH ROW EXECUTE PROCEDURE update_updated_at_column();
+
+-- TRIGGER TO AUTOMATICALLY SET RESPONSIBLE MATCHMAKER ON INSERT FROM AUTH SESSION
+CREATE OR REPLACE FUNCTION set_match_responsible_admin()
+RETURNS TRIGGER AS $$
+BEGIN
+  -- Auto-assign the authenticated session user ID if not provided
+  IF NEW.responsible_admin_id IS NULL AND auth.uid() IS NOT NULL THEN
+    NEW.responsible_admin_id := auth.uid();
+  END IF;
+
+  -- Auto-resolve their name from the trusted users table
+  IF NEW.responsible_admin_id IS NOT NULL THEN
+    SELECT name INTO NEW.responsible_admin_name
+    FROM users
+    WHERE id = NEW.responsible_admin_id;
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql SECURITY DEFINER;
+
+CREATE OR REPLACE TRIGGER before_match_insert
+BEFORE INSERT ON matches
+FOR EACH ROW
+EXECUTE FUNCTION set_match_responsible_admin();
 
 -- 10. INDEXES FOR MATCHES AND PROFILES
 CREATE INDEX IF NOT EXISTS idx_profiles_gender ON profiles(gender);

@@ -13,7 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { format, parseISO, isBefore, addDays, differenceInDays } from 'date-fns';
 import { Client, LeadCategory, LeadInterest, LeadSource, LeadStage, Branch, InteractionType, InteractionOutcome } from './types';
 import { SALES_MEMBERS } from './constants';
-import { Phone, Calendar, MessageSquare, Plus, FileSpreadsheet, Download, UserCheck, ArrowRight } from 'lucide-react';
+import { Phone, Calendar, MessageSquare, Plus, Filter, FileSpreadsheet, Download, UserCheck, ArrowRight } from 'lucide-react';
 import ImportData from './ImportData';
 import ImportHistory from './ImportHistory';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -35,6 +35,7 @@ export default function Leads() {
     canDeleteRecords 
   } = useAppContext();
   const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
+  const [isMobileFilterOpen, setIsMobileFilterOpen] = useState(false);
   const [selectedLead, setSelectedLead] = useState<Client | null>(null);
   const [newComment, setNewComment] = useState('');
   const [interactionType, setInteractionType] = useState<InteractionType>('Call');
@@ -365,9 +366,429 @@ export default function Leads() {
     return isBefore(nextReminder, threeDaysFromNow);
   };
 
+  // Extracted Reusable Lead Dialog content (Deduplicated Desktop/Mobile code)
+  const renderLeadDialogContent = (lead: Client) => {
+    return (
+      <DialogContent className="w-[95vw] sm:max-w-[90vw] lg:max-w-[1400px] h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl rounded-3xl bg-background/95 backdrop-blur-xl text-white">
+        <DialogHeader className="p-10 pb-6 bg-muted/30 border-b">
+          <div className="flex justify-between items-start">
+            <div className="space-y-1">
+              <DialogTitle className="text-3xl font-extrabold tracking-tight">Lead Profile: <span className="text-primary">{lead.name}</span></DialogTitle>
+              <div className="flex items-center gap-2 mt-2">
+                <div className="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest border border-primary/20">
+                  #{lead.memberId || 'PENDING ID'}
+                </div>
+                <Badge variant="outline" className="rounded-full px-3 py-0.5 border-muted-foreground/30 font-bold text-[10px]">
+                  {lead.status}
+                </Badge>
+              </div>
+            </div>
+          </div>
+        </DialogHeader>
+        
+        <div className="flex-1 overflow-y-auto p-10 custom-scrollbar">
+          <Tabs defaultValue="information" className="w-full">
+            <TabsList className="w-full justify-start border-b rounded-none px-0 mb-8 bg-transparent space-x-6 h-auto">
+              <TabsTrigger 
+                value="information" 
+                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 font-semibold tracking-wider uppercase text-xs text-muted-foreground data-[state=active]:text-primary"
+              >
+                <User className="h-4 w-4 mr-2" />
+                Information
+              </TabsTrigger>
+              <TabsTrigger 
+                value="interactions" 
+                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 font-semibold tracking-wider uppercase text-xs text-muted-foreground data-[state=active]:text-primary"
+              >
+                <Activity className="h-4 w-4 mr-2" />
+                Interactions
+              </TabsTrigger>
+              <TabsTrigger 
+                value="comments" 
+                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 font-semibold tracking-wider uppercase text-xs text-muted-foreground data-[state=active]:text-primary"
+              >
+                <MessageSquare className="h-4 w-4 mr-2" />
+                Comments
+              </TabsTrigger>
+              <TabsTrigger 
+                value="profilecard" 
+                className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 font-semibold tracking-wider uppercase text-xs text-muted-foreground data-[state=active]:text-primary"
+              >
+                <QrCode className="h-4 w-4 mr-2" />
+                Profile Code Card
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="information" className="mt-0 text-foreground">
+              <div className="bg-muted/30 p-8 rounded-[32px] border-2 border-white/10 shadow-inner">
+                <h3 className="text-sm font-black uppercase tracking-[0.2em] text-muted-foreground mb-8 flex items-center gap-3">
+                  <User className="h-4 w-4 text-primary" />
+                  Lead Details
+                </h3>
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Source</Label>
+                      <Select 
+                        defaultValue={lead.source} 
+                        onValueChange={(v) => updateClient(lead.id, { source: v as LeadSource })}
+                      >
+                        <SelectTrigger className="w-full bg-background/50 border-white/5 rounded-xl h-12">
+                          <SelectValue placeholder="Select source" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Instagram">Instagram</SelectItem>
+                          <SelectItem value="WhatsApp">WhatsApp</SelectItem>
+                          <SelectItem value="Walk-in">Referral</SelectItem>
+                          <SelectItem value="TikTok">TikTok</SelectItem>
+                          <SelectItem value="Other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Region</Label>
+                      <Select 
+                        defaultValue={lead.branch || ''} 
+                        onValueChange={(v) => updateClient(lead.id, { branch: v as Branch })}
+                      >
+                        <SelectTrigger className="w-full bg-background/50 border-white/5 rounded-xl h-12">
+                          <SelectValue placeholder="Select region" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="CAIRO">CAIRO</SelectItem>
+                          <SelectItem value="GIZA">GIZA</SelectItem>
+                          <SelectItem value="ONLINE">ONLINE</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Stage</Label>
+                      <Select 
+                        defaultValue={lead.stage} 
+                        onValueChange={(v) => handleStageChange(lead, v as LeadStage)}
+                      >
+                        <SelectTrigger className="w-full bg-background/50 border-white/5 rounded-xl h-12">
+                          <SelectValue placeholder="Select stage" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="New">New</SelectItem>
+                          <SelectItem value="Consultation Scheduled">Interview / Consultation</SelectItem>
+                          <SelectItem value="Follow Up">Follow Up</SelectItem>
+                          <SelectItem value="Converted">Converted</SelectItem>
+                          <SelectItem value="Lost">Lost</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Interest Level</Label>
+                      <Select 
+                        defaultValue={lead.interest} 
+                        onValueChange={(v) => handleInterestChange(lead, v as LeadInterest)}
+                      >
+                        <SelectTrigger className="w-full bg-background/50 border-white/5 rounded-xl h-12">
+                          <SelectValue placeholder="Select interest" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="Interested">Interested</SelectItem>
+                          <SelectItem value="Pending">Pending</SelectItem>
+                          <SelectItem value="Not Interested">Not Interested</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mt-8">
+                   <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Category / Reason</Label>
+                    <Select 
+                      defaultValue={lead.category}
+                      onValueChange={(v) => updateClient(lead.id, { category: v as LeadCategory })}
+                    >
+                      <SelectTrigger className="w-full bg-background/50 border-white/5 rounded-xl h-12">
+                        <SelectValue placeholder="Select loss category" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="Location mismatch">Location mismatch</SelectItem>
+                        <SelectItem value="Social status mismatch">Social status mismatch</SelectItem>
+                        <SelectItem value="Price">Fee too high</SelectItem>
+                        <SelectItem value="No answer">No response</SelectItem>
+                        <SelectItem value="Age mismatch">Age mismatch</SelectItem>
+                        <SelectItem value="Religious denomination mismatch">Religious denomination mismatch</SelectItem>
+                        <SelectItem value="Other">Other</SelectItem>
+                        <SelectItem value="None">None</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Consultation / Interview Date</Label>
+                    <Input 
+                      type="date" 
+                      className="w-full bg-background/50 border-white/5 rounded-xl h-12"
+                      defaultValue={lead.trialDate || lead.expectedVisitDate ? format(parseISO((lead.trialDate || lead.expectedVisitDate)), 'yyyy-MM-dd') : ''}
+                      onChange={(e) => updateClient(lead.id, { trialDate: new Date(e.target.value).toISOString(), expectedVisitDate: new Date(e.target.value).toISOString() })}
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 gap-8 mt-8">
+                  <div className="space-y-2">
+                    <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Reminder Date</Label>
+                    <Input 
+                      type="date" 
+                      className="w-full bg-background/50 border-white/5 rounded-xl h-12"
+                      defaultValue={lead.nextReminderDate ? format(parseISO(lead.nextReminderDate), 'yyyy-MM-dd') : ''}
+                      onChange={(e) => updateClient(lead.id, { nextReminderDate: new Date(e.target.value).toISOString() })}
+                    />
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="interactions" className="mt-0">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                <div className="lg:col-span-7 space-y-6">
+                  <div className="h-[400px] overflow-y-auto space-y-4 pr-4 custom-scrollbar bg-muted/10 p-6 rounded-[24px] border border-white/5">
+                    {lead.interactions && lead.interactions.length > 0 ? (
+                      [...lead.interactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(interaction => (
+                        <div key={interaction.id} className="bg-background/40 p-5 rounded-2xl border border-white/5 shadow-sm space-y-3">
+                          <div className="flex justify-between items-start">
+                            <div className="flex items-center gap-2">
+                              <Badge className={
+                                interaction.type === 'Call' ? 'bg-blue-500' :
+                                interaction.type === 'WhatsApp' ? 'bg-green-500' :
+                                interaction.type === 'Email' ? 'bg-amber-500' :
+                                'bg-purple-500'
+                              }>
+                                {interaction.type}
+                              </Badge>
+                              <Badge variant="outline" className="border-primary/20 text-primary">
+                                {interaction.outcome}
+                              </Badge>
+                            </div>
+                            <span className="text-[10px] uppercase font-black text-muted-foreground/60 tracking-tighter">
+                              {format(parseISO(interaction.date), 'MMM d, h:mm a')}
+                            </span>
+                          </div>
+                          <p className="text-sm leading-relaxed text-foreground/90 italic">"{interaction.notes}"</p>
+                          <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground/50 border-t border-white/5 pt-2">
+                            <span className="flex items-center gap-1"><User className="h-3 w-3" /> {interaction.author}</span>
+                            {interaction.nextFollowUp && (
+                              <span className="flex items-center gap-1 text-amber-500/80">
+                                <Calendar className="h-3 w-3" /> Follow-up: {format(parseISO(interaction.nextFollowUp), 'MMM d')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="h-full flex flex-col items-center justify-center text-muted-foreground italic gap-4">
+                        <div className="p-4 bg-muted/20 rounded-full">
+                          <Activity className="h-8 w-8 opacity-20" />
+                        </div>
+                        No interactions logged yet.
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="bg-background/80 backdrop-blur-sm p-8 rounded-[32px] border border-white/10 shadow-2xl space-y-6 text-foreground">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Type</Label>
+                        <Select value={interactionType} onValueChange={(v) => setInteractionType(v as InteractionType)}>
+                          <SelectTrigger className="bg-muted/20 border-white/5 rounded-xl h-10">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Call">Call</SelectItem>
+                            <SelectItem value="WhatsApp">WhatsApp</SelectItem>
+                            <SelectItem value="Email">Email</SelectItem>
+                            <SelectItem value="Visit">Visit</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Outcome</Label>
+                        <Select value={interactionOutcome} onValueChange={(v) => setInteractionOutcome(v as InteractionOutcome)}>
+                          <SelectTrigger className="bg-muted/20 border-white/5 rounded-xl h-10">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="Interested">Interested</SelectItem>
+                            <SelectItem value="Not Answered">Not Answered</SelectItem>
+                            <SelectItem value="Scheduled Consultation">Scheduled Consultation</SelectItem>
+                            <SelectItem value="Rejected">Rejected</SelectItem>
+                            <SelectItem value="Other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Follow-up Reminder (Optional)</Label>
+                      <Input 
+                        type="date" 
+                        className="bg-muted/20 border-white/5 rounded-xl h-10" 
+                        value={nextFollowUpDate}
+                        onChange={(e) => setNextFollowUpDate(e.target.value)}
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Interaction Notes</Label>
+                      <Textarea 
+                        placeholder="Summary of the conversation..." 
+                        className="min-h-[100px] rounded-2xl bg-muted/20 border-white/5 focus:border-primary/30 transition-all resize-none p-4"
+                        value={interactionNotes}
+                        onChange={(e) => setInteractionNotes(e.target.value)}
+                      />
+                    </div>
+                    <Button className="w-full rounded-2xl py-6 font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-[1.01] active:scale-[0.99] transition-transform" onClick={handleAddInteraction}>
+                      Log Interaction
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="lg:col-span-5 h-full">
+                  <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-[32px] p-8 border border-primary/10 h-full flex flex-col items-center text-center space-y-6">
+                    <div className="p-5 bg-background shadow-xl rounded-2xl rotate-3">
+                      <Phone className="h-8 w-8 text-primary" />
+                    </div>
+                    <div className="space-y-2">
+                      <h4 className="font-black text-xl tracking-tight">Structured Logging</h4>
+                      <p className="text-sm text-muted-foreground leading-relaxed">
+                        Log each call, message or visit with specific outcomes to build a detailed history of engagement.
+                      </p>
+                    </div>
+                    <div className="w-full h-px bg-primary/10" />
+                    <div className="grid grid-cols-2 gap-4 w-full">
+                      <div className="p-4 bg-background/50 rounded-2xl border border-white/5">
+                        <div className="text-2xl font-black text-primary">{lead.interactions?.length || 0}</div>
+                        <div className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Total Logs</div>
+                      </div>
+                      <div className="p-4 bg-background/50 rounded-2xl border border-white/5">
+                        <div className="text-2xl font-black text-primary">
+                          {lead.lastContactDate ? differenceInDays(new Date(), parseISO(lead.lastContactDate)) : '∞'}
+                        </div>
+                        <div className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Days Since</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+
+            <TabsContent value="comments" className="mt-0">
+              <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
+                <div className="lg:col-span-7 space-y-6">
+                  <div className="h-[400px] overflow-y-auto space-y-4 pr-4 custom-scrollbar bg-muted/10 p-6 rounded-[24px] border border-white/5">
+                    {lead.comments.length > 0 ? (
+                      [...lead.comments].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(comment => (
+                        <div key={comment.id} className="bg-background/40 p-4 rounded-2xl text-sm border border-white/5 shadow-sm">
+                          <p className="leading-relaxed text-foreground/90">{comment.text}</p>
+                          <div className="flex justify-between mt-3 text-[10px] uppercase tracking-wider font-extrabold text-muted-foreground/60">
+                            <span className="flex items-center gap-1.5"><User className="h-3 w-3" /> {comment.author}</span>
+                            <span>{format(parseISO(comment.date), 'MMM d, h:mm a')}</span>
+                          </div>
+                        </div>
+                      ))
+                    ) : (
+                      <div className="h-full flex items-center justify-center text-muted-foreground italic text-sm">
+                        No comments logged yet.
+                      </div>
+                    )}
+                  </div>
+                  
+                  <div className="bg-background/80 backdrop-blur-sm p-6 rounded-[32px] border border-white/10 shadow-2xl space-y-4 text-foreground">
+                    <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">General Note</Label>
+                    <Textarea 
+                      placeholder="Type any additional internal notes here..." 
+                      className="min-h-[120px] rounded-2xl bg-muted/20 border-white/5 focus:border-primary/30 transition-all resize-none p-4"
+                      value={newComment}
+                      onChange={(e) => setNewComment(e.target.value)}
+                    />
+                    <Button className="w-full rounded-2xl py-6 font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform" onClick={handleAddComment}>
+                      Save Note
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="lg:col-span-5">
+                  <div className="bg-primary/5 rounded-[32px] p-8 border border-primary/10 h-full flex flex-col justify-center items-center text-center space-y-4">
+                    <div className="p-4 bg-primary/10 rounded-full">
+                      <MessageSquare className="h-8 w-8 text-primary" />
+                    </div>
+                    <h4 className="font-bold text-lg">Internal Comments</h4>
+                    <p className="text-sm text-muted-foreground px-4">Internal notes for team collaboration and background information.</p>
+                  </div>
+                </div>
+              </div>
+            </TabsContent>
+            
+            <TabsContent value="profilecard" className="mt-0 space-y-8">
+               <div className="flex flex-col items-center justify-center p-12 bg-muted/30 rounded-[32px] border border-white/5">
+                 <div className="text-center mb-8">
+                   <h3 className="text-2xl font-black mb-2">Candidate Profile Card</h3>
+                   <p className="text-muted-foreground">Unique identifier for matchmaking verification.</p>
+                 </div>
+                 
+                 <div className="w-[320px] bg-gradient-to-br from-primary to-primary-foreground/30 p-6 rounded-3xl shadow-2xl text-white mb-8 border border-white/20 transform transition-transform hover:scale-105">
+                   <div className="flex justify-between items-center mb-6">
+                     <span className="text-xs uppercase tracking-widest font-black opacity-80">Matchmaking CRM</span>
+                     <Badge className="bg-white/20 text-white hover:bg-white/30 border-none font-bold">
+                       {lead.gender === 'Male' ? 'Gentleman' : lead.gender === 'Female' ? 'Lady' : 'Candidate'}
+                     </Badge>
+                   </div>
+                   <div className="space-y-4 my-8 text-center">
+                     <div className="text-sm font-bold opacity-80">Candidate Code</div>
+                     <div className="text-5xl font-extrabold tracking-wider filter drop-shadow">
+                       {lead.code || lead.memberId || 'N/A'}
+                     </div>
+                   </div>
+                   <div className="border-t border-white/10 pt-4 flex justify-between items-center">
+                     <div>
+                       <div className="text-[10px] uppercase tracking-widest opacity-60">Full Name</div>
+                       <div className="text-sm font-bold truncate max-w-[180px]">{lead.name}</div>
+                     </div>
+                     <div className="text-right">
+                       <div className="text-[10px] uppercase tracking-widest opacity-60">Region</div>
+                       <div className="text-xs font-bold">{lead.branch || 'N/A'}</div>
+                     </div>
+                   </div>
+                 </div>
+                 
+                 <div className="flex justify-center">
+                   <Button 
+                     onClick={async () => {
+                       try {
+                         await navigator.clipboard.writeText(lead.code || lead.memberId || lead.id);
+                         alert('Candidate code copied to clipboard!');
+                       } catch (err) {
+                         alert('Failed to copy code');
+                       }
+                     }}
+                     className="font-black uppercase tracking-widest px-8 py-6 rounded-2xl shadow-lg border-2 border-primary/20 hover:bg-primary"
+                   >
+                     <Copy className="mr-3 h-5 w-5" />
+                     Copy Profile Code
+                   </Button>
+                 </div>
+               </div>
+            </TabsContent>
+          </Tabs>
+        </div>
+      </DialogContent>
+    );
+  };
+
   const renderLeadsTable = (leadsData: Client[]) => (
     <div className="overflow-x-auto">
-      <Table>
+      
+            {/* Desktop Table View */}
+            <div className="hidden md:block">
+              <Table>
         <TableHeader>
           <TableRow>
             <TableHead className="w-[50px]">
@@ -497,417 +918,7 @@ export default function Leads() {
                     <MessageSquare className="h-4 w-4 mr-2" />
                     <span className="hidden sm:inline">Log Activity</span>
                   </DialogTrigger>
-                  <DialogContent className="!w-full !max-w-[1400px] h-[90vh] overflow-hidden flex flex-col p-0 border-none shadow-2xl rounded-3xl bg-background/95 backdrop-blur-xl">
-                    <DialogHeader className="p-10 pb-6 bg-muted/30 border-b">
-                      <div className="flex justify-between items-start">
-                        <div className="space-y-1">
-                          <DialogTitle className="text-3xl font-extrabold tracking-tight">Lead Profile: <span className="text-primary">{lead.name}</span></DialogTitle>
-                          <div className="flex items-center gap-2 mt-2">
-                            <div className="bg-primary/10 text-primary px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest border border-primary/20">
-                              #{lead.memberId || 'PENDING ID'}
-                            </div>
-                            <Badge variant="outline" className="rounded-full px-3 py-0.5 border-muted-foreground/30 font-bold text-[10px]">
-                              {lead.status}
-                            </Badge>
-                          </div>
-                        </div>
-                      </div>
-                    </DialogHeader>
-                    
-                    <div className="flex-1 overflow-y-auto p-10 custom-scrollbar">
-                      <Tabs defaultValue="information" className="w-full">
-                        <TabsList className="w-full justify-start border-b rounded-none px-0 mb-8 bg-transparent space-x-6 h-auto">
-                          <TabsTrigger 
-                            value="information" 
-                            className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 font-semibold tracking-wider uppercase text-xs text-muted-foreground data-[state=active]:text-primary"
-                          >
-                            <User className="h-4 w-4 mr-2" />
-                            Information
-                          </TabsTrigger>
-                          <TabsTrigger 
-                            value="interactions" 
-                            className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 font-semibold tracking-wider uppercase text-xs text-muted-foreground data-[state=active]:text-primary"
-                          >
-                            <Activity className="h-4 w-4 mr-2" />
-                            Interactions
-                          </TabsTrigger>
-                          <TabsTrigger 
-                            value="comments" 
-                            className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 font-semibold tracking-wider uppercase text-xs text-muted-foreground data-[state=active]:text-primary"
-                          >
-                            <MessageSquare className="h-4 w-4 mr-2" />
-                            Comments
-                          </TabsTrigger>
-                          <TabsTrigger 
-                            value="profilecard" 
-                            className="bg-transparent data-[state=active]:bg-transparent data-[state=active]:shadow-none data-[state=active]:border-b-2 data-[state=active]:border-primary rounded-none px-4 py-3 font-semibold tracking-wider uppercase text-xs text-muted-foreground data-[state=active]:text-primary"
-                          >
-                            <QrCode className="h-4 w-4 mr-2" />
-                            Profile Code Card
-                          </TabsTrigger>
-                        </TabsList>
-
-                        <TabsContent value="information" className="mt-0">
-                          <div className="bg-muted/30 p-8 rounded-[32px] border-2 border-white/10 shadow-inner">
-                            <h3 className="text-sm font-black uppercase tracking-[0.2em] text-muted-foreground mb-8 flex items-center gap-3">
-                              <User className="h-4 w-4 text-primary" />
-                              Lead Details
-                            </h3>
-                            
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8">
-                              <div className="space-y-4">
-                                <div className="space-y-2">
-                                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Source</Label>
-                                  <Select 
-                                    defaultValue={lead.source} 
-                                    onValueChange={(v) => updateClient(lead.id, { source: v as LeadSource })}
-                                  >
-                                    <SelectTrigger className="w-full bg-background/50 border-white/5 rounded-xl h-12">
-                                      <SelectValue placeholder="Select source" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="Instagram">Instagram</SelectItem>
-                                      <SelectItem value="WhatsApp">WhatsApp</SelectItem>
-                                      <SelectItem value="Walk-in">Referral</SelectItem>
-                                      <SelectItem value="TikTok">TikTok</SelectItem>
-                                      <SelectItem value="Other">Other</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                <div className="space-y-2">
-                                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Region</Label>
-                                  <Select 
-                                    defaultValue={lead.branch || ''} 
-                                    onValueChange={(v) => updateClient(lead.id, { branch: v as Branch })}
-                                  >
-                                    <SelectTrigger className="w-full bg-background/50 border-white/5 rounded-xl h-12">
-                                      <SelectValue placeholder="Select region" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="CAIRO">CAIRO</SelectItem>
-                                      <SelectItem value="GIZA">GIZA</SelectItem>
-                                      <SelectItem value="ONLINE">ONLINE</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                              </div>
-
-                              <div className="space-y-4">
-                                <div className="space-y-2">
-                                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Stage</Label>
-                                  <Select 
-                                    defaultValue={lead.stage} 
-                                    onValueChange={(v) => handleStageChange(lead, v as LeadStage)}
-                                  >
-                                    <SelectTrigger className="w-full bg-background/50 border-white/5 rounded-xl h-12">
-                                      <SelectValue placeholder="Select stage" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="New">New</SelectItem>
-                                      <SelectItem value="Consultation Scheduled">Interview / Consultation</SelectItem>
-                                      <SelectItem value="Follow Up">Follow Up</SelectItem>
-                                      <SelectItem value="Converted">Converted</SelectItem>
-                                      <SelectItem value="Lost">Lost</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                                <div className="space-y-2">
-                                  <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Interest Level</Label>
-                                  <Select 
-                                    defaultValue={lead.interest} 
-                                    onValueChange={(v) => handleInterestChange(lead, v as LeadInterest)}
-                                  >
-                                    <SelectTrigger className="w-full bg-background/50 border-white/5 rounded-xl h-12">
-                                      <SelectValue placeholder="Select interest" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="Interested">Interested</SelectItem>
-                                      <SelectItem value="Pending">Pending</SelectItem>
-                                      <SelectItem value="Not Interested">Not Interested</SelectItem>
-                                    </SelectContent>
-                                  </Select>
-                                </div>
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-8 mt-8">
-                               <div className="space-y-2">
-                                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Category / Reason</Label>
-                                <Select 
-                                  defaultValue={lead.category}
-                                  onValueChange={(v) => updateClient(lead.id, { category: v as LeadCategory })}
-                                >
-                                  <SelectTrigger className="w-full bg-background/50 border-white/5 rounded-xl h-12">
-                                    <SelectValue placeholder="Select loss category" />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    <SelectItem value="Location mismatch">Location mismatch</SelectItem>
-                                    <SelectItem value="Social status mismatch">Social status mismatch</SelectItem>
-                                    <SelectItem value="Price">Fee too high</SelectItem>
-                                    <SelectItem value="No answer">No response</SelectItem>
-                                    <SelectItem value="Age mismatch">Age mismatch</SelectItem>
-                                    <SelectItem value="Religious denomination mismatch">Religious denomination mismatch</SelectItem>
-                                    <SelectItem value="Other">Other</SelectItem>
-                                    <SelectItem value="None">None</SelectItem>
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                              <div className="space-y-2">
-                                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Consultation / Interview Date</Label>
-                                <Input 
-                                  type="date" 
-                                  className="w-full bg-background/50 border-white/5 rounded-xl h-12"
-                                  defaultValue={lead.trialDate || lead.expectedVisitDate ? format(parseISO((lead.trialDate || lead.expectedVisitDate)), 'yyyy-MM-dd') : ''}
-                                  onChange={(e) => updateClient(lead.id, { trialDate: new Date(e.target.value).toISOString(), expectedVisitDate: new Date(e.target.value).toISOString() })}
-                                />
-                              </div>
-                            </div>
-
-                            <div className="grid grid-cols-1 gap-8 mt-8">
-                              <div className="space-y-2">
-                                <Label className="text-xs font-bold uppercase tracking-wider text-muted-foreground">Next Reminder Date</Label>
-                                <Input 
-                                  type="date" 
-                                  className="w-full bg-background/50 border-white/5 rounded-xl h-12"
-                                  defaultValue={lead.nextReminderDate ? format(parseISO(lead.nextReminderDate), 'yyyy-MM-dd') : ''}
-                                  onChange={(e) => updateClient(lead.id, { nextReminderDate: new Date(e.target.value).toISOString() })}
-                                />
-                              </div>
-                            </div>
-                          </div>
-                        </TabsContent>
-                        
-                        <TabsContent value="interactions" className="mt-0">
-                          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-                            <div className="lg:col-span-7 space-y-6">
-                              <div className="h-[400px] overflow-y-auto space-y-4 pr-4 custom-scrollbar bg-muted/10 p-6 rounded-[24px] border border-white/5">
-                                {lead.interactions && lead.interactions.length > 0 ? (
-                                  [...lead.interactions].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(interaction => (
-                                    <div key={interaction.id} className="bg-background/40 p-5 rounded-2xl border border-white/5 shadow-sm space-y-3">
-                                      <div className="flex justify-between items-start">
-                                        <div className="flex items-center gap-2">
-                                          <Badge className={
-                                            interaction.type === 'Call' ? 'bg-blue-500' :
-                                            interaction.type === 'WhatsApp' ? 'bg-green-500' :
-                                            interaction.type === 'Email' ? 'bg-amber-500' :
-                                            'bg-purple-500'
-                                          }>
-                                            {interaction.type}
-                                          </Badge>
-                                          <Badge variant="outline" className="border-primary/20 text-primary">
-                                            {interaction.outcome}
-                                          </Badge>
-                                        </div>
-                                        <span className="text-[10px] uppercase font-black text-muted-foreground/60 tracking-tighter">
-                                          {format(parseISO(interaction.date), 'MMM d, h:mm a')}
-                                        </span>
-                                      </div>
-                                      <p className="text-sm leading-relaxed text-foreground/90 italic">"{interaction.notes}"</p>
-                                      <div className="flex justify-between items-center text-[10px] font-bold text-muted-foreground/50 border-t border-white/5 pt-2">
-                                        <span className="flex items-center gap-1"><User className="h-3 w-3" /> {interaction.author}</span>
-                                        {interaction.nextFollowUp && (
-                                          <span className="flex items-center gap-1 text-amber-500/80">
-                                            <Calendar className="h-3 w-3" /> Follow-up: {format(parseISO(interaction.nextFollowUp), 'MMM d')}
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                  ))
-                                ) : (
-                                  <div className="h-full flex flex-col items-center justify-center text-muted-foreground italic gap-4">
-                                    <div className="p-4 bg-muted/20 rounded-full">
-                                      <Activity className="h-8 w-8 opacity-20" />
-                                    </div>
-                                    No interactions logged yet.
-                                  </div>
-                                )}
-                              </div>
-                              
-                              <div className="bg-background/80 backdrop-blur-sm p-8 rounded-[32px] border border-white/10 shadow-2xl space-y-6">
-                                <div className="grid grid-cols-2 gap-4">
-                                  <div className="space-y-2">
-                                    <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Type</Label>
-                                    <Select value={interactionType} onValueChange={(v) => setInteractionType(v as InteractionType)}>
-                                      <SelectTrigger className="bg-muted/20 border-white/5 rounded-xl h-10">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="Call">Call</SelectItem>
-                                        <SelectItem value="WhatsApp">WhatsApp</SelectItem>
-                                        <SelectItem value="Email">Email</SelectItem>
-                                        <SelectItem value="Visit">Visit</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                  <div className="space-y-2">
-                                    <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Outcome</Label>
-                                    <Select value={interactionOutcome} onValueChange={(v) => setInteractionOutcome(v as InteractionOutcome)}>
-                                      <SelectTrigger className="bg-muted/20 border-white/5 rounded-xl h-10">
-                                        <SelectValue />
-                                      </SelectTrigger>
-                                      <SelectContent>
-                                        <SelectItem value="Interested">Interested</SelectItem>
-                                        <SelectItem value="Not Answered">Not Answered</SelectItem>
-                                        <SelectItem value="Scheduled Consultation">Scheduled Consultation</SelectItem>
-                                        <SelectItem value="Rejected">Rejected</SelectItem>
-                                        <SelectItem value="Other">Other</SelectItem>
-                                      </SelectContent>
-                                    </Select>
-                                  </div>
-                                </div>
-                                <div className="space-y-2">
-                                  <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Follow-up Reminder (Optional)</Label>
-                                  <Input 
-                                    type="date" 
-                                    className="bg-muted/20 border-white/5 rounded-xl h-10" 
-                                    value={nextFollowUpDate}
-                                    onChange={(e) => setNextFollowUpDate(e.target.value)}
-                                  />
-                                </div>
-                                <div className="space-y-2">
-                                  <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">Interaction Notes</Label>
-                                  <Textarea 
-                                    placeholder="Summary of the conversation..." 
-                                    className="min-h-[100px] rounded-2xl bg-muted/20 border-white/5 focus:border-primary/30 transition-all resize-none p-4"
-                                    value={interactionNotes}
-                                    onChange={(e) => setInteractionNotes(e.target.value)}
-                                  />
-                                </div>
-                                <Button className="w-full rounded-2xl py-6 font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-[1.01] active:scale-[0.99] transition-transform" onClick={handleAddInteraction}>
-                                  Log Interaction
-                                </Button>
-                              </div>
-                            </div>
-
-                            <div className="lg:col-span-5 h-full">
-                              <div className="bg-gradient-to-br from-primary/10 to-primary/5 rounded-[32px] p-8 border border-primary/10 h-full flex flex-col items-center text-center space-y-6">
-                                <div className="p-5 bg-background shadow-xl rounded-2xl rotate-3">
-                                  <Phone className="h-8 w-8 text-primary" />
-                                </div>
-                                <div className="space-y-2">
-                                  <h4 className="font-black text-xl tracking-tight">Structured Logging</h4>
-                                  <p className="text-sm text-muted-foreground leading-relaxed">
-                                    Log each call, message or visit with specific outcomes to build a detailed history of engagement.
-                                  </p>
-                                </div>
-                                <div className="w-full h-px bg-primary/10" />
-                                <div className="grid grid-cols-2 gap-4 w-full">
-                                  <div className="p-4 bg-background/50 rounded-2xl border border-white/5">
-                                    <div className="text-2xl font-black text-primary">{lead.interactions?.length || 0}</div>
-                                    <div className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Total Logs</div>
-                                  </div>
-                                  <div className="p-4 bg-background/50 rounded-2xl border border-white/5">
-                                    <div className="text-2xl font-black text-primary">
-                                      {lead.lastContactDate ? differenceInDays(new Date(), parseISO(lead.lastContactDate)) : '∞'}
-                                    </div>
-                                    <div className="text-[10px] uppercase tracking-widest font-bold text-muted-foreground">Days Since</div>
-                                  </div>
-                                </div>
-                              </div>
-                            </div>
-                          </div>
-                        </TabsContent>
-
-                        <TabsContent value="comments" className="mt-0">
-                          <div className="grid grid-cols-1 lg:grid-cols-12 gap-10">
-                            <div className="lg:col-span-7 space-y-6">
-                              <div className="h-[400px] overflow-y-auto space-y-4 pr-4 custom-scrollbar bg-muted/10 p-6 rounded-[24px] border border-white/5">
-                                {lead.comments.length > 0 ? (
-                                  [...lead.comments].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(comment => (
-                                    <div key={comment.id} className="bg-background/40 p-4 rounded-2xl text-sm border border-white/5 shadow-sm">
-                                      <p className="leading-relaxed text-foreground/90">{comment.text}</p>
-                                      <div className="flex justify-between mt-3 text-[10px] uppercase tracking-wider font-extrabold text-muted-foreground/60">
-                                        <span className="flex items-center gap-1.5"><User className="h-3 w-3" /> {comment.author}</span>
-                                        <span>{format(parseISO(comment.date), 'MMM d, h:mm a')}</span>
-                                      </div>
-                                    </div>
-                                  ))
-                                ) : (
-                                  <div className="h-full flex items-center justify-center text-muted-foreground italic text-sm">
-                                    No comments logged yet.
-                                  </div>
-                                )}
-                              </div>
-                              
-                              <div className="bg-background/80 backdrop-blur-sm p-6 rounded-[32px] border border-white/10 shadow-2xl space-y-4">
-                                <Label className="text-xs font-black uppercase tracking-widest text-muted-foreground ml-1">General Note</Label>
-                                <Textarea 
-                                  placeholder="Type any additional internal notes here..." 
-                                  className="min-h-[120px] rounded-2xl bg-muted/20 border-white/5 focus:border-primary/30 transition-all resize-none p-4"
-                                  value={newComment}
-                                  onChange={(e) => setNewComment(e.target.value)}
-                                />
-                                <Button className="w-full rounded-2xl py-6 font-black uppercase tracking-widest shadow-lg shadow-primary/20 hover:scale-[1.02] transition-transform" onClick={handleAddComment}>
-                                  Save Note
-                                </Button>
-                              </div>
-                            </div>
-
-                            <div className="lg:col-span-5">
-                              <div className="bg-primary/5 rounded-[32px] p-8 border border-primary/10 h-full flex flex-col justify-center items-center text-center space-y-4">
-                                <div className="p-4 bg-primary/10 rounded-full">
-                                  <MessageSquare className="h-8 w-8 text-primary" />
-                                </div>
-                                <h4 className="font-bold text-lg">Internal Comments</h4>
-                                <p className="text-sm text-muted-foreground px-4">Internal notes for team collaboration and background information.</p>
-                              </div>
-                            </div>
-                          </div>
-                        </TabsContent>
-                        
-                        <TabsContent value="profilecard" className="mt-0 space-y-8">
-                           <div className="flex flex-col items-center justify-center p-12 bg-muted/30 rounded-[32px] border border-white/5">
-                             <div className="text-center mb-8">
-                               <h3 className="text-2xl font-black mb-2">Candidate Profile Card</h3>
-                               <p className="text-muted-foreground">Unique identifier for matchmaking verification.</p>
-                             </div>
-                             
-                             <div className="w-[320px] bg-gradient-to-br from-primary to-primary-foreground/30 p-6 rounded-3xl shadow-2xl text-white mb-8 border border-white/20 transform transition-transform hover:scale-105">
-                               <div className="flex justify-between items-center mb-6">
-                                 <span className="text-xs uppercase tracking-widest font-black opacity-80">Matchmaking CRM</span>
-                                 <Badge className="bg-white/20 text-white hover:bg-white/30 border-none font-bold">
-                                   {lead.gender === 'Male' ? 'Gentleman' : lead.gender === 'Female' ? 'Lady' : 'Candidate'}
-                                 </Badge>
-                               </div>
-                               <div className="space-y-4 my-8 text-center">
-                                 <div className="text-sm font-bold opacity-80">Candidate Code</div>
-                                 <div className="text-5xl font-extrabold tracking-wider filter drop-shadow">
-                                   {lead.code || lead.memberId || 'N/A'}
-                                 </div>
-                               </div>
-                               <div className="border-t border-white/10 pt-4 flex justify-between items-center">
-                                 <div>
-                                   <div className="text-[10px] uppercase tracking-widest opacity-60">Full Name</div>
-                                   <div className="text-sm font-bold truncate max-w-[180px]">{lead.name}</div>
-                                 </div>
-                                 <div className="text-right">
-                                   <div className="text-[10px] uppercase tracking-widest opacity-60">Region</div>
-                                   <div className="text-xs font-bold">{lead.branch || 'N/A'}</div>
-                                 </div>
-                               </div>
-                             </div>
-                             
-                             <div className="flex justify-center">
-                               <Button 
-                                 onClick={async () => {
-                                   try {
-                                     await navigator.clipboard.writeText(lead.code || lead.memberId || lead.id);
-                                     alert('Candidate code copied to clipboard!');
-                                   } catch (err) {
-                                     alert('Failed to copy code');
-                                   }
-                                 }}
-                                 className="font-black uppercase tracking-widest px-8 py-6 rounded-2xl shadow-lg border-2 border-primary/20 hover:bg-primary"
-                               >
-                                 <Copy className="mr-3 h-5 w-5" />
-                                 Copy Profile Code
-                               </Button>
-                             </div>
-                           </div>
-                        </TabsContent>
-                      </Tabs>
-                    </div>
-                  </DialogContent>
+                  {renderLeadDialogContent(lead)}
                 </Dialog>
                 {canDeleteRecords && (
                   <Button variant="ghost" size="icon" className="text-destructive" onClick={() => handleDeleteLead(lead.id)}>
@@ -919,6 +930,103 @@ export default function Leads() {
           ))}
         </TableBody>
       </Table>
+            </div>
+
+            {/* Mobile Card Grid View */}
+            <div className="block md:hidden p-4 space-y-4">
+              {leadsData.map(lead => {
+                const isOverdue = lead.nextReminderDate ? isBefore(parseISO(lead.nextReminderDate), new Date()) : false;
+                const isDueSoon = lead.nextReminderDate ? isBefore(parseISO(lead.nextReminderDate), addDays(new Date(), 3)) : false;
+                const isUnassigned = !lead.assignedTo;
+
+                return (
+                  <Card key={lead.id} className={`bg-gradient-to-br from-zinc-900/50 to-zinc-950 border border-white/10 shadow-xl rounded-2xl overflow-hidden ${isReminderDue(lead) ? (isOverdue ? 'border-red-500/30' : 'border-amber-500/30') : ''}`}>
+                    <CardHeader className="pb-2 border-b border-white/5 bg-zinc-900/20 p-4">
+                      <div className="flex justify-between items-start">
+                        <div className="space-y-1">
+                          <div className="flex items-center gap-2">
+                            <span className="font-extrabold text-white text-base tracking-wide">{lead.name}</span>
+                            {getScoreBadge(calculateLeadScore(lead))}
+                          </div>
+                          <div className="flex items-center gap-1.5 text-zinc-400 text-xs font-semibold">
+                            <span className="font-mono text-zinc-500">#{lead.memberId || '---'}</span>
+                            <span className="text-zinc-600">•</span>
+                            <Badge variant="secondary" className="px-1 text-[9px]">{lead.branch || 'Unassigned'}</Badge>
+                          </div>
+                        </div>
+                        <Badge variant="outline" className="border-pink-500/30 text-pink-400 text-[10px] font-extrabold tracking-wide uppercase px-2 py-0.5 rounded-full">
+                          {lead.stage || 'New'}
+                        </Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="p-4 space-y-3.5 text-xs text-zinc-300">
+                      <div className="grid grid-cols-2 gap-2 text-xs">
+                        <div className="bg-zinc-900/30 p-2 rounded-lg border border-white/5">
+                          <span className="text-zinc-500 block text-[9px] uppercase font-bold">Source</span>
+                          <span className="font-semibold text-white">{lead.source || 'Unknown'}</span>
+                        </div>
+                        <div className="bg-zinc-900/30 p-2 rounded-lg border border-white/5">
+                          <span className="text-zinc-500 block text-[9px] uppercase font-bold">Interest Level</span>
+                          <div className="mt-0.5">{getInterestBadge(lead.interest)}</div>
+                        </div>
+                      </div>
+
+                      {/* Contact Preview & Next Reminder */}
+                      <div className="space-y-1.5 bg-zinc-950/40 p-2.5 rounded-lg border border-white/5">
+                        <div className="flex items-center justify-between text-zinc-400">
+                          <div className="flex items-center gap-1.5">
+                            <Phone className="h-3 w-3 text-zinc-500" />
+                            <span className="font-mono text-[11px]">
+                              {currentUser?.role === 'rep' && lead.assignedTo !== currentUser.id ? '**********' : lead.phone}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="flex items-center justify-between text-[11px]">
+                          <span className="text-zinc-500 flex items-center gap-1"><Calendar className="h-3 w-3" /> Next Follow-up:</span>
+                          <span className="font-bold text-zinc-200">
+                            {lead.nextReminderDate ? (
+                              <span className="flex items-center gap-1.5">
+                                {format(parseISO(lead.nextReminderDate), 'MMM d, yyyy')}
+                                {isOverdue ? (
+                                  <span className="text-red-500 font-extrabold text-[9px]">OVERDUE</span>
+                                ) : isDueSoon ? (
+                                  <span className="text-amber-500 font-extrabold text-[9px]">DUE SOON</span>
+                                ) : null}
+                              </span>
+                            ) : 'Not set'}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Rep Assigned */}
+                      <div className="flex justify-between items-center text-[10px] text-zinc-500 pt-2 border-t border-white/5">
+                        <span>Assigned Rep:</span>
+                        <Badge variant="outline" className="border-white/5 text-zinc-400 text-[9px] font-medium bg-zinc-900/30">
+                          {users.find(u => u.id === lead.assignedTo)?.name || 'Unassigned'}
+                        </Badge>
+                      </div>
+
+                      {/* Actions Trigger */}
+                      <Dialog>
+                        <DialogTrigger asChild>
+                          <Button className="w-full mt-2 bg-gradient-to-r from-pink-500 to-purple-600 hover:from-pink-600 hover:to-purple-700 text-white font-extrabold h-9 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-pink-900/20" onClick={() => setSelectedLead(lead)}>
+                            Log Activity & Details
+                          </Button>
+                        </DialogTrigger>
+                        {renderLeadDialogContent(lead)}
+                      </Dialog>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+              
+              {leadsData.length === 0 && (
+                <div className="text-center py-16 text-zinc-500 italic text-sm">
+                  No leads found matching your search.
+                </div>
+              )}
+            </div>
+
     </div>
   );
 
@@ -1014,7 +1122,131 @@ export default function Leads() {
         </div>
       </div>
 
-      <Card className="p-4">
+              {/* Mobile Float Filter Button & Toggle Panel */}
+        <div className="md:hidden flex justify-between items-center gap-3 p-4 bg-zinc-950 border border-white/5 rounded-xl mb-4">
+          <div className="relative flex-1">
+            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-zinc-500" />
+            <Input 
+              placeholder="Search Name/Phone..." 
+              className="pl-8 bg-zinc-900 border-zinc-800 text-xs h-9 text-white placeholder:text-zinc-600 rounded-lg"
+              value={searchTerm}
+              onChange={e => setSearchTerm(e.target.value)}
+            />
+          </div>
+          <Button 
+            onClick={() => setIsMobileFilterOpen(true)}
+            className="bg-zinc-900 border border-white/10 text-white rounded-lg h-9 px-3 flex items-center gap-1.5 text-xs"
+          >
+            <Filter className="h-3.5 w-3.5 text-pink-400" />
+            Filters
+            {(filterBranch !== 'All' || filterStage !== 'All' || filterInterest !== 'All' || filterAssignedTo !== 'All' || sortBy !== 'default') && (
+              <span className="bg-pink-500 text-white rounded-full text-[10px] px-1 font-bold">!</span>
+            )}
+          </Button>
+        </div>
+
+        {/* Mobile Filter Drawer Overlay */}
+        <div className={`fixed inset-0 z-50 transition-all duration-300 ${isMobileFilterOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsMobileFilterOpen(false)} />
+          <div className={`fixed bottom-0 left-0 right-0 max-h-[85vh] bg-zinc-950 border-t border-white/10 rounded-t-3xl p-6 overflow-y-auto transition-transform duration-300 transform ${isMobileFilterOpen ? 'translate-y-0' : 'translate-y-full'} text-white space-y-6`}>
+            <div className="flex justify-between items-center border-b border-white/5 pb-3">
+              <h3 className="text-base font-bold flex items-center gap-2">
+                <Filter className="h-5 w-5 text-pink-400" /> Advanced Filters
+              </h3>
+              <Button variant="ghost" onClick={() => setIsMobileFilterOpen(false)} className="text-zinc-400 hover:text-white text-xs font-semibold">
+                Done
+              </Button>
+            </div>
+            
+            <div className="space-y-4">
+              {/* Region */}
+              <div className="space-y-1">
+                <Label className="text-zinc-400 text-xs font-bold uppercase tracking-wider">Region</Label>
+                <Select value={filterBranch} onValueChange={(v) => setFilterBranch(v as Branch | 'All')}>
+                  <SelectTrigger className="w-full bg-zinc-900 border-zinc-800 text-xs h-10 text-white"><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-zinc-900 border-zinc-800 text-white">
+                    <SelectItem value="All">All Regions</SelectItem>
+                    <SelectItem value="CAIRO">CAIRO</SelectItem>
+                    <SelectItem value="GIZA">GIZA</SelectItem>
+                    <SelectItem value="ONLINE">ONLINE</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Stage */}
+              <div className="space-y-1">
+                <Label className="text-zinc-400 text-xs font-bold uppercase tracking-wider">Stage</Label>
+                <Select value={filterStage} onValueChange={(v) => setFilterStage(v as LeadStage | 'All')}>
+                  <SelectTrigger className="w-full bg-zinc-900 border-zinc-800 text-xs h-10 text-white"><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-zinc-900 border-zinc-800 text-white">
+                    <SelectItem value="All">All Stages</SelectItem>
+                    <SelectItem value="New">New</SelectItem>
+                    <SelectItem value="Follow Up">Follow Up</SelectItem>
+                    <SelectItem value="Consultation Scheduled">Interview / Consultation</SelectItem>
+                    <SelectItem value="Converted">Converted</SelectItem>
+                    <SelectItem value="Lost">Lost</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Interest */}
+              <div className="space-y-1">
+                <Label className="text-zinc-400 text-xs font-bold uppercase tracking-wider">Interest</Label>
+                <Select value={filterInterest} onValueChange={(v) => setFilterInterest(v as LeadInterest | 'All')}>
+                  <SelectTrigger className="w-full bg-zinc-900 border-zinc-800 text-xs h-10 text-white"><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-zinc-900 border-zinc-800 text-white">
+                    <SelectItem value="All">All Interests</SelectItem>
+                    <SelectItem value="Interested">Interested</SelectItem>
+                    <SelectItem value="Not Interested">Not Interested</SelectItem>
+                    <SelectItem value="Pending">Pending</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Assigned To */}
+              <div className="space-y-1">
+                <Label className="text-zinc-400 text-xs font-bold uppercase tracking-wider">Assigned To</Label>
+                <Select value={filterAssignedTo} onValueChange={setFilterAssignedTo}>
+                  <SelectTrigger className="w-full bg-zinc-900 border-zinc-800 text-xs h-10 text-white"><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-zinc-950 border-zinc-800 text-white">
+                    <SelectItem value="All">All Reps</SelectItem>
+                    <SelectItem value="unassigned">Unassigned</SelectItem>
+                    <SelectGroup>
+                      <SelectLabel className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase">System Users</SelectLabel>
+                      {users.filter(u => u.role === 'rep').map(rep => (
+                        <SelectItem key={rep.id} value={rep.id}>{rep.name || rep.email || 'Unknown User'}</SelectItem>
+                      ))}
+                    </SelectGroup>
+                    <SelectGroup>
+                      <SelectLabel className="px-2 py-1.5 text-xs font-semibold text-muted-foreground uppercase">Sales Members</SelectLabel>
+                      {SALES_MEMBERS.map(name => (
+                        <SelectItem key={name} value={name}>{name}</SelectItem>
+                      ))}
+                    </SelectGroup>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Sort By */}
+              <div className="space-y-1">
+                <Label className="text-zinc-400 text-xs font-bold uppercase tracking-wider">Sort by</Label>
+                <Select value={sortBy} onValueChange={(v) => setSortBy(v as 'default' | 'score')}>
+                  <SelectTrigger className="w-full bg-zinc-900 border-zinc-800 text-xs h-10 text-white"><SelectValue /></SelectTrigger>
+                  <SelectContent className="bg-zinc-950 border-zinc-800 text-white">
+                    <SelectItem value="default">Default</SelectItem>
+                    <SelectItem value="score">Score (High-Low)</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <Button onClick={() => setIsMobileFilterOpen(false)} className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white font-bold h-11 rounded-xl">
+              Apply Filters
+            </Button>
+          </div>
+        </div>
+
+        <Card className="p-4 hidden md:block">
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4">
           <div className="space-y-2">
             <Label className="text-xs">Sort By</Label>

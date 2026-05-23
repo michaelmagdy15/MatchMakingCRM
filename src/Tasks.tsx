@@ -80,9 +80,9 @@ export default function Tasks() {
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'Completed': return <CheckCircle2 className="h-5 w-5 text-green-500" />;
+      case 'Completed': return <CheckCircle2 className="h-5 w-5 text-emerald-500 fill-emerald-500/10" />;
       case 'In Progress': return <Clock className="h-5 w-5 text-amber-500" />;
-      default: return <Circle className="h-5 w-5 text-muted-foreground" />;
+      default: return <Circle className="h-5 w-5 text-zinc-400 dark:text-zinc-600 hover:text-pink-500 transition-colors" />;
     }
   };
 
@@ -196,10 +196,11 @@ export default function Tasks() {
 
             return (
               <Card key={task.id} className={`transition-all ${task.status === 'Completed' ? 'opacity-60 bg-muted/50' : ''}`}>
-                <CardContent className="p-4 sm:p-6 flex items-start gap-4">
+                <CardContent className="p-3.5 sm:p-5 flex items-start gap-3">
                   <button 
                     onClick={() => updateTask(task.id, { status: task.status === 'Completed' ? 'Pending' : 'Completed' })}
-                    className="mt-1 flex-shrink-0 hover:scale-110 transition-transform"
+                    className="flex-shrink-0 w-9 h-9 -ml-2 -mt-2 flex items-center justify-center rounded-full hover:bg-muted/15 active:bg-muted/25 transition-all text-left"
+                    title={task.status === 'Completed' ? 'Mark incomplete' : 'Mark complete'}
                   >
                     {getStatusIcon(task.status)}
                   </button>
