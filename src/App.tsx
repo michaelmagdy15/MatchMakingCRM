@@ -80,7 +80,7 @@ function AppContent() {
     );
   }
 
-  const isPortal = window.location.pathname.startsWith('/portal');
+  const isPortal = window.location.pathname.toLowerCase().startsWith('/portal');
   if (isPortal) {
     return <Portal />;
   }
