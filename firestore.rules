@@ -65,6 +65,36 @@ service cloud.firestore {
     }
 
     // ===============================================================
+    // Match Prefixed Helper Functions
+    // ===============================================================
+    function getMatchUserData() {
+      let uid = request.auth != null ? request.auth.uid : 'anonymous';
+      let userPath = /databases/$(database)/documents/match_users/$(uid);
+      return (request.auth != null && exists(userPath)) ? get(userPath).data : {
+        "role": "none",
+        "name": "Anonymous",
+        "can_delete_payments": false,
+        "can_access_settings_and_history": false,
+        "can_view_global_dashboard": false
+      };
+    }
+
+    function canMatchAccessSettings() {
+      let data = getMatchUserData();
+      return request.auth != null && (
+        data.role in ['super_admin', 'crm_admin', 'sales_manager', 'manager'] ||
+        data.can_access_settings_and_history == true
+      );
+    }
+
+    function isMatchAdmin() {
+      let data = getMatchUserData();
+      return request.auth != null && (
+        data.role in ['admin', 'super_admin', 'crm_admin', 'sales_manager', 'manager']
+      );
+    }
+
+    // ===============================================================
     // Entity Validators
     // ===============================================================
 
@@ -194,6 +224,59 @@ service cloud.firestore {
 
     match /importBatches/{batchId} {
       allow read, write: if isAdmin();
+    }
+
+    // ===============================================================
+    // Duplicated Rules for Prefixed collections (match_*)
+    // ===============================================================
+
+    match /match_users/{userId} {
+      allow read: if isAuthenticated();
+      allow create: if isOwner(userId) || isMatchAdmin();
+      allow update: if isOwner(userId) || isMatchAdmin();
+      allow delete: if isMatchAdmin();
+    }
+
+    match /match_clients/{clientId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidClient(request.resource.data);
+      allow update: if isAuthenticated();
+      allow delete: if isMatchAdmin();
+    }
+
+    match /match_matches/{matchId} {
+      allow read: if isAuthenticated();
+      allow create: if isAuthenticated() && isValidMatch(request.resource.data);
+      allow update: if isAuthenticated();
+      allow delete: if isMatchAdmin();
+    }
+
+    match /{path=**}/match_comments/{commentId} {
+      allow read, create: if isAuthenticated();
+      allow delete: if isMatchAdmin();
+    }
+
+    match /{path=**}/match_interactions/{interactionId} {
+      allow read, create: if isAuthenticated();
+      allow delete: if isMatchAdmin();
+    }
+
+    match /match_tasks/{taskId} {
+      allow read, write: if isAuthenticated();
+    }
+
+    match /match_auditLogs/{logId} {
+      allow read: if canMatchAccessSettings();
+      allow create: if isAuthenticated();
+      allow delete: if canMatchAccessSettings();
+    }
+
+    match /match_importBatches/{batchId} {
+      allow read, write: if isMatchAdmin();
+    }
+
+    match /match_counters/{counterId} {
+      allow read, write: if isAuthenticated();
     }
   }
 }

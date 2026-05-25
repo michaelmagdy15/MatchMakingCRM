@@ -1,1 +1,5 @@
-{ "projects": { "default": "gen-lang-client-0565330624" } }
+{
+  "projects": {
+    "default": "faa-test-guide-v2"
+  }
+}

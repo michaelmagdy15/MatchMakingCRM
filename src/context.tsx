@@ -1,5 +1,21 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
-import { supabase, isSupabaseConfigured } from './supabase';
+import { auth, db } from './firebase';
+import { 
+  collection, 
+  doc, 
+  getDoc, 
+  getDocs, 
+  setDoc, 
+  updateDoc, 
+  deleteDoc, 
+  query, 
+  where,
+  addDoc
+} from 'firebase/firestore';
+import { onAuthStateChanged, signOut } from 'firebase/auth';
+
+const isSupabaseConfigured = false;
+const supabase: any = null;
 import { 
   Client, 
   User, 
@@ -212,19 +228,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       timestamp: new Date().toISOString()
     };
 
-    if (isSupabaseConfigured && supabase) {
-      try {
-        await supabase.from('audit_logs').insert({
-          user_id: currentUser.id,
-          action,
-          entity_type: entityType,
-          entity_id: entityId,
-          details,
-          timestamp: newLog.timestamp
-        });
-      } catch (e) {
-        console.error('Audit logger failed to save to Supabase:', e);
-      }
+    try {
+      await setDoc(doc(db, 'match_audit_logs', newLog.id), camelToSnake(newLog));
+    } catch (e) {
+      console.error('Audit logger failed to save to Firestore:', e);
     }
 
     setAuditLogs(prev => [newLog, ...prev]);
@@ -232,68 +239,112 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Load Initial Database State
   const fetchAllData = useCallback(async (userId: string) => {
-    if (isSupabaseConfigured && supabase) {
-      try {
-        // Fetch Users
-        const { data: dbUsers } = await supabase.from('users').select('*');
-        if (dbUsers) setUsers(dbUsers.map(snakeToCamel));
+    try {
+      // Fetch Users
+      const usersSnapshot = await getDocs(collection(db, 'match_users'));
+      const firestoreUsers = usersSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...snakeToCamel(data)
+        } as User;
+      });
+      setUsers(firestoreUsers.length > 0 ? firestoreUsers : MOCK_USERS);
 
-        // Fetch Profiles
-        const { data: dbProfiles } = await supabase.from('profiles').select('*');
-        if (dbProfiles) setBaseClients(dbProfiles.map(snakeToCamel));
+      // Fetch Profiles
+      const profilesSnapshot = await getDocs(collection(db, 'match_profiles'));
+      const firestoreProfiles = profilesSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...snakeToCamel(data)
+        } as Client;
+      });
+      setBaseClients(firestoreProfiles.length > 0 ? firestoreProfiles : mockClients);
 
-        // Fetch Matches
-        const { data: dbMatches } = await supabase.from('matches').select('*');
-        if (dbMatches) {
-          const mappedMatches = dbMatches.map(m => {
-            const camel = snakeToCamel(m);
-            return {
-              ...camel,
-              clientId: camel.clientId || camel.maleId || '',
-              date: camel.date || camel.createdAt || new Date().toISOString()
-            };
-          });
-          setBaseMatches(mappedMatches);
+      // Fetch Matches
+      const matchesSnapshot = await getDocs(collection(db, 'match_matches'));
+      const firestoreMatches = matchesSnapshot.docs.map(doc => {
+        const data = doc.data();
+        const camel = snakeToCamel(data);
+        return {
+          id: doc.id,
+          ...camel,
+          clientId: camel.clientId || camel.maleId || '',
+          date: camel.date || camel.createdAt || new Date().toISOString()
+        } as Match;
+      });
+      setBaseMatches(firestoreMatches.length > 0 ? firestoreMatches : mockMatches);
+
+      // Fetch Tasks
+      const tasksSnapshot = await getDocs(collection(db, 'match_tasks'));
+      const firestoreTasks = tasksSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...snakeToCamel(data)
+        } as Task;
+      });
+      setTasks(firestoreTasks);
+
+      // Fetch Audit Logs
+      const logsSnapshot = await getDocs(collection(db, 'match_audit_logs'));
+      const firestoreLogs = logsSnapshot.docs.map(doc => {
+        const data = doc.data();
+        return {
+          id: doc.id,
+          ...snakeToCamel(data)
+        } as AuditLog;
+      });
+      firestoreLogs.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
+      setAuditLogs(firestoreLogs);
+
+      // Fetch Comments
+      const commentsSnapshot = await getDocs(collection(db, 'match_comments'));
+      const commMap: Record<string, CRMComment[]> = {};
+      commentsSnapshot.docs.forEach(doc => {
+        const data = doc.data();
+        const camelData = snakeToCamel(data);
+        const profId = camelData.profileId;
+        const camel = {
+          id: doc.id,
+          text: camelData.text,
+          date: camelData.date,
+          author: camelData.author
+        } as CRMComment;
+        if (profId) {
+          if (!commMap[profId]) commMap[profId] = [];
+          commMap[profId].push(camel);
         }
+      });
+      setComments(commMap);
 
-        // Fetch Tasks
-        const { data: dbTasks } = await supabase.from('tasks').select('*');
-        if (dbTasks) setTasks(dbTasks.map(snakeToCamel));
-
-        // Fetch Audit Logs
-        const { data: dbLogs } = await supabase.from('audit_logs').select('*').order('timestamp', { ascending: false }).limit(200);
-        if (dbLogs) setAuditLogs(dbLogs.map(snakeToCamel));
-
-        // Fetch Comments
-        const { data: dbComments } = await supabase.from('comments').select('*');
-        if (dbComments) {
-          const commMap: Record<string, CRMComment[]> = {};
-          dbComments.forEach(c => {
-            const camel = snakeToCamel(c);
-            const profId = camel.profileId;
-            if (!commMap[profId]) commMap[profId] = [];
-            commMap[profId].push(camel);
-          });
-          setComments(commMap);
+      // Fetch Interactions
+      const interactionsSnapshot = await getDocs(collection(db, 'match_interactions'));
+      const intMap: Record<string, InteractionLog[]> = {};
+      interactionsSnapshot.docs.forEach(doc => {
+        const data = doc.data();
+        const camelData = snakeToCamel(data);
+        const profId = camelData.profileId;
+        const camel = {
+          id: doc.id,
+          date: camelData.date,
+          type: camelData.type,
+          outcome: camelData.outcome,
+          notes: camelData.notes,
+          nextFollowUp: camelData.nextFollowUp,
+          author: camelData.author
+        } as InteractionLog;
+        if (profId) {
+          if (!intMap[profId]) intMap[profId] = [];
+          intMap[profId].push(camel);
         }
+      });
+      setInteractions(intMap);
 
-        // Fetch Interactions
-        const { data: dbInteractions } = await supabase.from('interactions').select('*');
-        if (dbInteractions) {
-          const intMap: Record<string, InteractionLog[]> = {};
-          dbInteractions.forEach(i => {
-            const camel = snakeToCamel(i);
-            const profId = camel.profileId;
-            if (!intMap[profId]) intMap[profId] = [];
-            intMap[profId].push(camel);
-          });
-          setInteractions(intMap);
-        }
-      } catch (error) {
-        console.error('Error fetching Supabase data:', error);
-      }
-    } else {
-      // Local Storage Load
+    } catch (error) {
+      console.error('Error fetching Firestore data:', error);
+      // Fallback to local storage
       const loadedUsers = localStorage.getItem(STORAGE_KEYS.USERS);
       setUsers(loadedUsers ? JSON.parse(loadedUsers) : MOCK_USERS);
 
@@ -327,23 +378,57 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Auth Initialization
   useEffect(() => {
-    const initAuth = async () => {
+    const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       let savedUser: User | null = null;
-      if (isSupabaseConfigured && supabase) {
-        const { data } = await supabase.auth.getUser();
-        if (data?.user) {
-          const { data: profile } = await supabase.from('users').select('*').eq('email', data.user.email).single();
-          if (profile) {
-            savedUser = snakeToCamel(profile);
-          } else {
+      
+      if (firebaseUser) {
+        try {
+          // Query Firestore match_users collection by UID
+          const userDocRef = doc(db, 'match_users', firebaseUser.uid);
+          const userDoc = await getDoc(userDocRef);
+          
+          if (userDoc.exists()) {
+            const data = userDoc.data();
             savedUser = {
-              id: data.user.id,
-              name: data.user.user_metadata?.full_name || data.user.email?.split('@')[0] || 'User',
-              email: data.user.email || '',
-              role: 'rep'
+              id: firebaseUser.uid,
+              name: data.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+              email: firebaseUser.email || '',
+              role: data.role || 'rep'
             };
-            await supabase.from('users').insert(camelToSnake(savedUser));
+          } else {
+            // Also try query by email to see if user exists with different ID
+            const usersRef = collection(db, 'match_users');
+            const q = query(usersRef, where('email', '==', firebaseUser.email));
+            const querySnapshot = await getDocs(q);
+            
+            if (!querySnapshot.empty) {
+              const matchedDoc = querySnapshot.docs[0];
+              const data = matchedDoc.data();
+              savedUser = {
+                id: matchedDoc.id,
+                name: data.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+                email: firebaseUser.email || '',
+                role: data.role || 'rep'
+              };
+            } else {
+              // Create user profile in Firestore
+              savedUser = {
+                id: firebaseUser.uid,
+                name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+                email: firebaseUser.email || '',
+                role: 'rep'
+              };
+              await setDoc(userDocRef, camelToSnake(savedUser));
+            }
           }
+        } catch (error) {
+          console.error("Error fetching user profile from Firestore:", error);
+          savedUser = {
+            id: firebaseUser.uid,
+            name: firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'User',
+            email: firebaseUser.email || '',
+            role: 'rep'
+          };
         }
       } else {
         const localUser = localStorage.getItem(STORAGE_KEYS.USER);
@@ -353,18 +438,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       if (savedUser) {
         setCurrentUser(savedUser);
         await fetchAllData(savedUser.id);
+      } else {
+        setCurrentUser(null);
       }
       setIsAuthReady(true);
-    };
+    });
 
-    initAuth();
+    return () => unsubscribe();
   }, [fetchAllData]);
 
   // Login handler
   const login = async (email?: string, name?: string, role?: UserRole) => {
-    // If Supabase auth is wired, we could do signInWithOAuth.
-    // However, to make this incredibly easy for the admins out-of-the-box,
-    // we support typing or picking pre-defined accounts to log in!
     const targetEmail = email || 'sarah@datingcrm.com';
     const targetName = name || 'Sarah';
     const targetRole = role || 'crm_admin';
@@ -376,15 +460,38 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       role: targetRole
     };
 
-    if (isSupabaseConfigured && supabase) {
-      // Upsert into Supabase Users table
-      const { data: existingUser } = await supabase.from('users').select('*').eq('email', targetEmail).single();
-      if (existingUser) {
-        userObj = snakeToCamel(existingUser);
+    try {
+      // Query by email in Firestore match_users collection
+      const usersRef = collection(db, 'match_users');
+      const q = query(usersRef, where('email', '==', targetEmail));
+      const querySnapshot = await getDocs(q);
+      
+      if (!querySnapshot.empty) {
+        const matchedDoc = querySnapshot.docs[0];
+        const data = matchedDoc.data();
+        userObj = {
+          id: matchedDoc.id,
+          name: data.name || targetName,
+          email: targetEmail,
+          role: data.role || targetRole
+        };
       } else {
-        await supabase.from('users').insert(camelToSnake(userObj));
+        const docId = (auth.currentUser && auth.currentUser.email === targetEmail) 
+          ? auth.currentUser.uid 
+          : targetEmail.replace(/[^a-zA-Z0-9]/g, '-');
+        
+        userObj = {
+          id: docId,
+          name: targetName,
+          email: targetEmail,
+          role: targetRole
+        };
+        
+        const userDocRef = doc(db, 'match_users', docId);
+        await setDoc(userDocRef, camelToSnake(userObj));
       }
-    } else {
+    } catch (error) {
+      console.error("Firestore login update failed:", error);
       // Local Storage users save
       const localUsers = localStorage.getItem(STORAGE_KEYS.USERS);
       const currentUsersList: User[] = localUsers ? JSON.parse(localUsers) : MOCK_USERS;
@@ -404,8 +511,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const logout = async () => {
     setCurrentUser(null);
     localStorage.removeItem(STORAGE_KEYS.USER);
-    if (isSupabaseConfigured && supabase) {
-      await supabase.auth.signOut();
+    try {
+      await signOut(auth);
+    } catch (error) {
+      console.error("Error signing out from Firebase Auth:", error);
     }
   };
 
@@ -488,13 +597,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       status: client.status || 'Pending Review'
     };
 
-    if (isSupabaseConfigured && supabase) {
+    try {
       const dbObj = camelToSnake(newClient);
       delete dbObj.comments;
       delete dbObj.interactions;
-      const { error } = await supabase.from('profiles').insert(dbObj);
-      if (error) throw error;
-    } else {
+      await setDoc(doc(db, 'match_profiles', newId), dbObj);
+    } catch (error) {
+      console.error("Error adding client to Firestore:", error);
+      // Fallback
       const currentList = [...baseClients, newClient];
       localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(currentList));
     }
@@ -518,29 +628,22 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       };
 
       try {
-        if (isSupabaseConfigured && supabase) {
-          const dbObj = camelToSnake(newClient);
-          delete dbObj.comments;
-          delete dbObj.interactions;
-          const { error } = await supabase.from('profiles').insert(dbObj);
-          if (error) throw error;
-        }
+        const dbObj = camelToSnake(newClient);
+        delete dbObj.comments;
+        delete dbObj.interactions;
+        
+        await setDoc(doc(db, 'match_profiles', newId), dbObj);
         successList.push(newClient);
       } catch (e: any) {
         errors.push({ row: i + 1, reason: e.message || String(e) });
       }
     }
 
-    if (!isSupabaseConfigured) {
-      const currentList = [...baseClients, ...clientsList];
-      localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(currentList));
-      setBaseClients(currentList);
-      return { success: clientsList.length, failed: 0, errors: [] };
-    } else {
+    if (successList.length > 0) {
       setBaseClients(prev => [...prev, ...successList]);
       await addAuditLog('CREATE', 'CLIENT', 'bulk', `Bulk imported ${successList.length} profiles successfully.`);
-      return { success: successList.length, failed: errors.length, errors };
     }
+    return { success: successList.length, failed: errors.length, errors };
   };
 
   const updateClient = async (id: string, updates: Partial<Client>) => {
@@ -548,11 +651,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     delete cleanUpdates.comments;
     delete cleanUpdates.interactions;
 
-    if (isSupabaseConfigured && supabase) {
+    try {
       const dbObj = camelToSnake(cleanUpdates);
-      const { error } = await supabase.from('profiles').update(dbObj).eq('id', id);
-      if (error) throw error;
-    } else {
+      await updateDoc(doc(db, 'match_profiles', id), dbObj);
+    } catch (error) {
+      console.error("Error updating client in Firestore:", error);
       const currentList = baseClients.map(c => c.id === id ? { ...c, ...cleanUpdates } : c);
       localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(currentList));
     }
@@ -562,10 +665,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteClient = async (id: string) => {
-    if (isSupabaseConfigured && supabase) {
-      const { error } = await supabase.from('profiles').delete().eq('id', id);
-      if (error) throw error;
-    } else {
+    try {
+      await deleteDoc(doc(db, 'match_profiles', id));
+    } catch (error) {
+      console.error("Error deleting client from Firestore:", error);
       const currentList = baseClients.filter(c => c.id !== id);
       localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(currentList));
     }
@@ -575,10 +678,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteMultipleClients = async (ids: string[]) => {
-    if (isSupabaseConfigured && supabase) {
-      const { error } = await supabase.from('profiles').delete().in('id', ids);
-      if (error) throw error;
-    } else {
+    try {
+      for (const id of ids) {
+        await deleteDoc(doc(db, 'match_profiles', id));
+      }
+    } catch (error) {
+      console.error("Error batch deleting clients from Firestore:", error);
       const currentList = baseClients.filter(c => !ids.includes(c.id));
       localStorage.setItem(STORAGE_KEYS.PROFILES, JSON.stringify(currentList));
     }
@@ -637,28 +742,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       updatedAt: new Date().toISOString()
     };
 
-    if (isSupabaseConfigured && supabase) {
+    try {
       const dbMatch = camelToSnake(newMatch);
-      // Remove these fields so the database triggers handle it securely on the server-side
-      delete dbMatch.responsible_admin_id;
-      delete dbMatch.responsible_admin_name;
-
-      const { data, error } = await supabase
-        .from('matches')
-        .insert(dbMatch)
-        .select('*')
-        .single();
-      if (error) throw error;
-
-      if (data) {
-        const savedMatch = snakeToCamel(data) as Match;
-        newMatch = {
-          ...newMatch,
-          responsibleAdminId: savedMatch.responsibleAdminId,
-          responsibleAdminName: savedMatch.responsibleAdminName
-        };
-      }
-    } else {
+      await setDoc(doc(db, 'match_matches', newId), dbMatch);
+    } catch (error) {
+      console.error("Error adding match to Firestore:", error);
       const currentList = [...baseMatches, newMatch];
       localStorage.setItem(STORAGE_KEYS.MATCHES, JSON.stringify(currentList));
     }
@@ -689,10 +777,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     const oldMatch = baseMatches.find(m => m.id === id);
     const timeUpdates = { ...updates, updatedAt: new Date().toISOString() };
 
-    if (isSupabaseConfigured && supabase) {
-      const { error } = await supabase.from('matches').update(camelToSnake(timeUpdates)).eq('id', id);
-      if (error) throw error;
-    } else {
+    try {
+      await updateDoc(doc(db, 'match_matches', id), camelToSnake(timeUpdates));
+    } catch (error) {
+      console.error("Error updating match in Firestore:", error);
       const currentList = baseMatches.map(m => m.id === id ? { ...m, ...timeUpdates } : m);
       localStorage.setItem(STORAGE_KEYS.MATCHES, JSON.stringify(currentList));
     }
@@ -753,10 +841,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteMatch = async (id: string) => {
-    if (isSupabaseConfigured && supabase) {
-      const { error } = await supabase.from('matches').delete().eq('id', id);
-      if (error) throw error;
-    } else {
+    try {
+      await deleteDoc(doc(db, 'match_matches', id));
+    } catch (error) {
+      console.error("Error deleting match from Firestore:", error);
       const currentList = baseMatches.filter(m => m.id !== id);
       localStorage.setItem(STORAGE_KEYS.MATCHES, JSON.stringify(currentList));
     }
@@ -774,19 +862,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       author: author || currentUser?.name || 'Admin'
     };
 
-    if (isSupabaseConfigured && supabase) {
-      await supabase.from('comments').insert({
-        profile_id: clientId,
-        text,
-        author: newComment.author,
-        created_at: newComment.date
-      });
+    try {
+      await setDoc(doc(db, 'match_comments', newComment.id), camelToSnake({
+        ...newComment,
+        profileId: clientId
+      }));
+    } catch (error) {
+      console.error("Error adding comment to Firestore:", error);
     }
 
     setComments(prev => {
       const current = prev[clientId] || [];
       const updated = { ...prev, [clientId]: [...current, newComment] };
-      if (!isSupabaseConfigured) localStorage.setItem(STORAGE_KEYS.COMMENTS, JSON.stringify(updated));
+      localStorage.setItem(STORAGE_KEYS.COMMENTS, JSON.stringify(updated));
       return updated;
     });
   };
@@ -798,21 +886,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       author: currentUser?.name || 'Admin'
     };
 
-    if (isSupabaseConfigured && supabase) {
-      await supabase.from('interactions').insert({
-        profile_id: clientId,
-        type: newLog.type,
-        outcome: newLog.outcome,
-        notes: newLog.notes,
-        next_follow_up: newLog.nextFollowUp || null,
-        author: newLog.author
-      });
+    try {
+      await setDoc(doc(db, 'match_interactions', newLog.id), camelToSnake({
+        ...newLog,
+        profileId: clientId
+      }));
+    } catch (error) {
+      console.error("Error adding interaction to Firestore:", error);
     }
 
     setInteractions(prev => {
       const current = prev[clientId] || [];
       const updated = { ...prev, [clientId]: [...current, newLog] };
-      if (!isSupabaseConfigured) localStorage.setItem(STORAGE_KEYS.INTERACTIONS, JSON.stringify(updated));
+      localStorage.setItem(STORAGE_KEYS.INTERACTIONS, JSON.stringify(updated));
       return updated;
     });
   };
@@ -827,11 +913,11 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       createdBy: currentUser?.id || 'admin'
     };
 
-    if (isSupabaseConfigured && supabase) {
+    try {
       const dbObj = camelToSnake(newTask);
-      const { error } = await supabase.from('tasks').insert(dbObj);
-      if (error) throw error;
-    } else {
+      await setDoc(doc(db, 'match_tasks', newId), dbObj);
+    } catch (error) {
+      console.error("Error adding task to Firestore:", error);
       const currentList = [...tasks, newTask];
       localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(currentList));
     }
@@ -841,10 +927,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const updateTask = async (id: string, updates: Partial<Task>) => {
-    if (isSupabaseConfigured && supabase) {
-      const { error } = await supabase.from('tasks').update(camelToSnake(updates)).eq('id', id);
-      if (error) throw error;
-    } else {
+    try {
+      await updateDoc(doc(db, 'match_tasks', id), camelToSnake(updates));
+    } catch (error) {
+      console.error("Error updating task in Firestore:", error);
       const currentList = tasks.map(t => t.id === id ? { ...t, ...updates } : t);
       localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(currentList));
     }
@@ -853,10 +939,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteTask = async (id: string) => {
-    if (isSupabaseConfigured && supabase) {
-      const { error } = await supabase.from('tasks').delete().eq('id', id);
-      if (error) throw error;
-    } else {
+    try {
+      await deleteDoc(doc(db, 'match_tasks', id));
+    } catch (error) {
+      console.error("Error deleting task from Firestore:", error);
       const currentList = tasks.filter(t => t.id !== id);
       localStorage.setItem(STORAGE_KEYS.TASKS, JSON.stringify(currentList));
     }
@@ -866,9 +952,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // User Management
   const updateUser = async (id: string, updates: Partial<User>) => {
-    if (isSupabaseConfigured && supabase) {
-      await supabase.from('users').update(camelToSnake(updates)).eq('id', id);
-    } else {
+    try {
+      await updateDoc(doc(db, 'match_users', id), camelToSnake(updates));
+    } catch (error) {
+      console.error("Error updating user in Firestore:", error);
       const currentList = users.map(u => u.id === id ? { ...u, ...updates } : u);
       localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(currentList));
     }
@@ -876,9 +963,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   };
 
   const deleteUser = async (id: string) => {
-    if (isSupabaseConfigured && supabase) {
-      await supabase.from('users').delete().eq('id', id);
-    } else {
+    try {
+      await deleteDoc(doc(db, 'match_users', id));
+    } catch (error) {
+      console.error("Error deleting user from Firestore:", error);
       const currentList = users.filter(u => u.id !== id);
       localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(currentList));
     }
@@ -894,9 +982,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       role
     };
 
-    if (isSupabaseConfigured && supabase) {
-      await supabase.from('users').insert(camelToSnake(newUser));
-    } else {
+    try {
+      await setDoc(doc(db, 'match_users', newId), camelToSnake(newUser));
+    } catch (error) {
+      console.error("Error inviting user to Firestore:", error);
       const currentList = [...users, newUser];
       localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(currentList));
     }
@@ -916,8 +1005,14 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   const rollbackImport = async (batchId: string) => {
     // Delete all profiles matching batchId
-    if (isSupabaseConfigured && supabase) {
-      await supabase.from('profiles').delete().eq('import_batch_id', batchId);
+    try {
+      const q = query(collection(db, 'match_profiles'), where('import_batch_id', '==', batchId));
+      const snapshot = await getDocs(q);
+      for (const d of snapshot.docs) {
+        await deleteDoc(doc(db, 'match_profiles', d.id));
+      }
+    } catch (error) {
+      console.error("Error rolling back import batch in Firestore:", error);
     }
     setBaseClients(prev => prev.filter(c => c.importBatchId !== batchId));
     setImportBatches(prev => prev.filter(b => b.id !== batchId));
@@ -972,14 +1067,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const wipeSystem = async () => {
     const confirm = window.confirm('DANGER: This will permanently wipe all local database states. Continue?');
     if (!confirm) return;
-    if (isSupabaseConfigured && supabase) {
-      await supabase.from('matches').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('profiles').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('tasks').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-      await supabase.from('audit_logs').delete().neq('id', '00000000-0000-0000-0000-000000000000');
-    } else {
-      localStorage.clear();
+    try {
+      const collectionsToWipe = ['match_matches', 'match_profiles', 'match_tasks', 'match_audit_logs', 'match_comments', 'match_interactions'];
+      for (const colName of collectionsToWipe) {
+        const snapshot = await getDocs(collection(db, colName));
+        for (const docItem of snapshot.docs) {
+          await deleteDoc(doc(db, colName, docItem.id));
+        }
+      }
+    } catch (error) {
+      console.error("Error wiping system in Firestore:", error);
     }
+    localStorage.clear();
     setBaseClients([]);
     setBaseMatches([]);
     setTasks([]);

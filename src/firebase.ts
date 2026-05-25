@@ -28,3 +28,13 @@ export const logOut = async () => {
     throw error;
   }
 };
+
+export const signOutUser = async () => {
+  try {
+    await signOut(auth);
+  } catch (error) {
+    console.error("Error signing out", error);
+    throw error;
+  }
+};
+
