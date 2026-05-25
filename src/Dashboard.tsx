@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { MatchStatus, Match, Client } from './types';
 import { isSupabaseConfigured } from './supabase';
+import { ConfirmDialog } from './components/ConfirmDialog';
 
 export default function Dashboard() {
   const { 
@@ -39,11 +40,21 @@ export default function Dashboard() {
     deleteMatch, 
     currentUser, 
     users,
-    addComment
+    addComment,
+    matchMeetings,
+    recordMatchMeeting,
+    addTask
   } = useAppContext();
 
   // State to track which match cards have revealed contacts
   const [revealedMatches, setRevealedMatches] = React.useState<Record<string, boolean>>({});
+
+  // Dating scheduling states
+  const [isScheduleOpen, setIsScheduleOpen] = useState(false);
+  const [selectedMatchForDate, setSelectedMatchForDate] = useState<Match | null>(null);
+  const [dateVenue, setDateVenue] = useState<'CAIRO' | 'GIZA' | 'ONLINE'>('CAIRO');
+  const [dateTime, setDateTime] = useState('');
+  const [dateNotes, setDateNotes] = useState('');
 
   const maskPhone = (phone?: string) => {
     if (!phone) return 'N/A';
@@ -67,6 +78,10 @@ export default function Dashboard() {
   const [selectedLadyId, setSelectedLadyId] = useState('');
   const [proposalNotes, setProposalNotes] = useState('');
   const [activeColIndex, setActiveColIndex] = useState(0);
+
+  // Custom confirmation dialog states for archiving matches
+  const [showUnmatchConfirm, setShowUnmatchConfirm] = useState(false);
+  const [matchToUnmatch, setMatchToUnmatch] = useState<string | null>(null);
 
   // Filter candidates for match proposing
   const gentlemen = profiles.filter(
@@ -137,13 +152,13 @@ export default function Dashboard() {
     }
   };
 
-  // State Machine transition trigger helpers
+  // State Machine transition trigger helpers - Optimized to Demote Statuses on De-approval to prevent traps
   const toggleMaleProfileApprove = async (match: Match) => {
     const nextApproved = !match.maleProfileApproved;
     const isBothApproved = nextApproved && match.femaleProfileApproved;
     await updateMatch(match.id, {
       maleProfileApproved: nextApproved,
-      status: isBothApproved ? MatchStatus.PENDING_PHOTO_APPROVAL : match.status
+      status: isBothApproved ? MatchStatus.PENDING_PHOTO_APPROVAL : MatchStatus.PENDING_PROFILE_APPROVAL
     });
   };
 
@@ -152,7 +167,7 @@ export default function Dashboard() {
     const isBothApproved = match.maleProfileApproved && nextApproved;
     await updateMatch(match.id, {
       femaleProfileApproved: nextApproved,
-      status: isBothApproved ? MatchStatus.PENDING_PHOTO_APPROVAL : match.status
+      status: isBothApproved ? MatchStatus.PENDING_PHOTO_APPROVAL : MatchStatus.PENDING_PROFILE_APPROVAL
     });
   };
 
@@ -161,7 +176,7 @@ export default function Dashboard() {
     const isBothApproved = nextApproved && match.femalePhotoApproved;
     await updateMatch(match.id, {
       malePhotoApproved: nextApproved,
-      status: isBothApproved ? MatchStatus.PENDING_CONTACT_SHARE : match.status
+      status: isBothApproved ? MatchStatus.PENDING_CONTACT_SHARE : MatchStatus.PENDING_PHOTO_APPROVAL
     });
   };
 
@@ -170,7 +185,7 @@ export default function Dashboard() {
     const isBothApproved = match.malePhotoApproved && nextApproved;
     await updateMatch(match.id, {
       femalePhotoApproved: nextApproved,
-      status: isBothApproved ? MatchStatus.PENDING_CONTACT_SHARE : match.status
+      status: isBothApproved ? MatchStatus.PENDING_CONTACT_SHARE : MatchStatus.PENDING_PHOTO_APPROVAL
     });
   };
 
@@ -179,7 +194,7 @@ export default function Dashboard() {
     const isBothApproved = nextApproved && match.femaleContactApproved;
     await updateMatch(match.id, {
       maleContactApproved: nextApproved,
-      status: isBothApproved ? MatchStatus.MATCH_ACTIVE : match.status
+      status: isBothApproved ? MatchStatus.MATCH_ACTIVE : MatchStatus.PENDING_CONTACT_SHARE
     });
   };
 
@@ -188,7 +203,7 @@ export default function Dashboard() {
     const isBothApproved = match.maleContactApproved && nextApproved;
     await updateMatch(match.id, {
       femaleContactApproved: nextApproved,
-      status: isBothApproved ? MatchStatus.MATCH_ACTIVE : match.status
+      status: isBothApproved ? MatchStatus.MATCH_ACTIVE : MatchStatus.PENDING_CONTACT_SHARE
     });
   };
 
@@ -201,9 +216,71 @@ export default function Dashboard() {
     await updateMatch(match.id, updates);
   };
 
-  const handleUnmatch = async (matchId: string) => {
-    if (window.confirm('Are you sure you want to end this match proposal (Archive as Unmatched)?')) {
-      await updateMatch(matchId, { status: 'UNMATCHED' as MatchStatus });
+  const triggerUnmatch = (matchId: string) => {
+    setMatchToUnmatch(matchId);
+    setShowUnmatchConfirm(true);
+  };
+
+  const confirmUnmatch = async () => {
+    if (matchToUnmatch) {
+      await updateMatch(matchToUnmatch, { status: 'UNMATCHED' as MatchStatus });
+      setShowUnmatchConfirm(false);
+      setMatchToUnmatch(null);
+    }
+  };
+
+  const triggerScheduleDate = (match: Match) => {
+    setSelectedMatchForDate(match);
+    setDateVenue('CAIRO');
+    setDateTime(new Date().toISOString().slice(0, 16));
+    setDateNotes('');
+    setIsScheduleOpen(true);
+  };
+
+  const handleScheduleDateSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedMatchForDate || !dateTime) {
+      alert('Please fill out the date and time.');
+      return;
+    }
+
+    try {
+      await recordMatchMeeting(selectedMatchForDate.maleId, dateVenue);
+      await recordMatchMeeting(selectedMatchForDate.femaleId, dateVenue);
+
+      const dateString = new Date(dateTime).toLocaleString(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short'
+      });
+      
+      const maleComment = `[DATE SCHEDULED] Confirmed date/meeting scheduled with Lady ${selectedMatchForDate.femaleName} (${selectedMatchForDate.ladyCode}) on ${dateString} via ${dateVenue}. Notes: ${dateNotes || 'No specific notes.'}`;
+      const femaleComment = `[DATE SCHEDULED] Confirmed date/meeting scheduled with Gentleman ${selectedMatchForDate.maleName} (${selectedMatchForDate.gentlemanCode}) on ${dateString} via ${dateVenue}. Notes: ${dateNotes || 'No specific notes.'}`;
+      
+      await addComment(selectedMatchForDate.maleId, maleComment, currentUser?.name || 'Matchmaker');
+      await addComment(selectedMatchForDate.femaleId, femaleComment, currentUser?.name || 'Matchmaker');
+
+      const updatedNotes = (selectedMatchForDate.notes || '') + 
+        `\n\n[SCHEDULED DATE] ${dateString} @ ${dateVenue}: ${dateNotes || 'Meeting set.'}`;
+      await updateMatch(selectedMatchForDate.id, { notes: updatedNotes });
+
+      // Automatically create a post-date feedback call task due 1 day after the scheduled date
+      const postDateDue = new Date(dateTime);
+      postDateDue.setDate(postDateDue.getDate() + 1);
+
+      await addTask({
+        title: `[Post-Date Feedback Call] Match #${selectedMatchForDate.id} (${selectedMatchForDate.gentlemanCode} & ${selectedMatchForDate.ladyCode})`,
+        description: `Conduct a post-date feedback call with Gentleman ${selectedMatchForDate.gentlemanCode} (${selectedMatchForDate.maleName}) and Lady ${selectedMatchForDate.ladyCode} (${selectedMatchForDate.femaleName}) to collect feedback about their date at ${dateVenue} on ${dateString}.`,
+        dueDate: postDateDue.toISOString(),
+        status: 'Pending',
+        priority: 'High',
+        clientId: selectedMatchForDate.maleId,
+        assignedTo: selectedMatchForDate.responsibleAdminId || currentUser?.id || 'admin-sarah'
+      });
+
+      setIsScheduleOpen(false);
+      setSelectedMatchForDate(null);
+    } catch (err: any) {
+      alert('Failed to schedule date: ' + err.message);
     }
   };
 
@@ -254,13 +331,21 @@ export default function Dashboard() {
   const renderColumn = (col: typeof columns[0], isMobile = false) => {
     const colMatches = matches.filter(m => m.status === col.status);
 
+    const accentClasses: Record<string, string> = {
+      indigo: "bg-indigo-500/10 text-indigo-400 border-indigo-500/20",
+      pink: "bg-pink-500/10 text-pink-400 border-pink-500/20",
+      amber: "bg-amber-500/10 text-amber-400 border-amber-500/20",
+      emerald: "bg-emerald-500/10 text-emerald-400 border-emerald-500/20",
+      cyan: "bg-cyan-500/10 text-cyan-400 border-cyan-500/20",
+    };
+
     return (
       <div key={col.status} className={`rounded-2xl p-4 border ${col.bg} ${col.border} flex flex-col space-y-4 ${isMobile ? 'min-h-[400px]' : 'min-h-[500px]'}`}>
         {/* Column Title Header */}
         <div className="space-y-1">
           <div className="flex items-center justify-between">
             <h3 className="font-bold text-sm text-zinc-100 tracking-tight">{col.title}</h3>
-            <Badge variant="outline" className={`bg-${col.accent}-500/10 text-${col.accent}-400 border-${col.accent}-500/20`}>
+            <Badge variant="outline" className={accentClasses[col.accent] || "bg-zinc-500/10 text-zinc-400 border-zinc-500/20"}>
               {colMatches.length}
             </Badge>
           </div>
@@ -289,7 +374,7 @@ export default function Dashboard() {
                       variant="ghost" 
                       size="icon" 
                       className="h-6 w-6 text-zinc-600 hover:text-rose-400 hover:bg-zinc-900 rounded-md"
-                      onClick={() => handleUnmatch(match.id)}
+                      onClick={() => triggerUnmatch(match.id)}
                     >
                       <X className="h-3 w-3" />
                     </Button>
@@ -394,7 +479,7 @@ export default function Dashboard() {
                           <Badge className="bg-emerald-500/10 text-emerald-400 text-[8px] border-emerald-500/10">Active Match</Badge>
                         </div>
                         <div className="space-y-1.5 pt-1">
-                          <div className="flex justify-between items-center text-[10px]">
+                          <div className="flex justify-between items-center text-[10px] pb-1.5 border-b border-white/5">
                             <span className="text-zinc-400 flex items-center gap-1"><CalendarDays className="h-3 w-3 text-zinc-500" /> 1-Week Check:</span>
                             <Select 
                               value={match.firstCheck || 'Pending'} 
@@ -411,6 +496,14 @@ export default function Dashboard() {
                               </SelectContent>
                             </Select>
                           </div>
+                          <Button 
+                            size="sm"
+                            variant="outline"
+                            className="w-full h-7 text-[9px] bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-pink-400 hover:text-pink-300 font-bold tracking-wider uppercase mt-1 rounded-lg flex items-center justify-center gap-1 cursor-pointer"
+                            onClick={() => triggerScheduleDate(match)}
+                          >
+                            <CalendarDays className="h-3.5 w-3.5 text-pink-400" /> Schedule Date
+                          </Button>
                         </div>
                       </div>
                     )}
@@ -686,8 +779,43 @@ export default function Dashboard() {
         </Card>
       </div>
 
+      {/* Date & Meeting Scheduler Overview Panel */}
+      {matchMeetings.length > 0 && (
+        <Card className="bg-zinc-950/60 border border-white/10 shadow-2xl overflow-hidden rounded-2xl backdrop-blur-md">
+          <CardHeader className="border-b border-white/5 bg-zinc-900/20 p-4 sm:p-5 flex flex-row items-center justify-between">
+            <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+              <CalendarDays className="h-4.5 w-4.5 text-pink-500" /> Active Dates & Match Consultations ({matchMeetings.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-4 sm:p-5">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 max-h-[220px] overflow-y-auto pr-1 no-scrollbar">
+              {[...matchMeetings].reverse().map(meeting => {
+                const client = profiles.find(p => p.id === meeting.clientId);
+                return (
+                  <div key={meeting.id} className="flex items-center justify-between p-3.5 rounded-2xl bg-zinc-900/40 border border-white/5 shadow-sm text-xs transition-all hover:scale-[1.01]">
+                    <div className="space-y-1 min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <Badge className="bg-pink-500/10 text-pink-400 border border-pink-500/20 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-lg shrink-0">{client?.code || 'C-XXX'}</Badge>
+                        <span className="font-bold text-zinc-200 truncate">{client?.fullName || client?.name || 'Anonymous Candidate'}</span>
+                      </div>
+                      <p className="text-[10px] text-zinc-500 flex items-center gap-1.5">
+                        <span>Venue/Method:</span> <strong className="text-zinc-300 font-semibold uppercase tracking-wider text-[9px]">{meeting.branch}</strong>
+                      </p>
+                    </div>
+                    <div className="text-right flex-shrink-0 ml-3">
+                      <p className="font-bold text-pink-400 font-mono text-[11px]">{new Date(meeting.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                      <p className="text-[9px] text-zinc-500 uppercase font-bold tracking-widest mt-0.5">Confirmed</p>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* Mobile Kanban Board Tabs (viewports below md) */}
-      <div className="md:hidden flex gap-2 overflow-x-auto pb-3 -mx-4 px-4 scrollbar-none snap-x snap-mandatory">
+      <div className="md:hidden flex gap-2 overflow-x-auto pb-3 -mx-4 px-4 no-scrollbar snap-x snap-mandatory">
         {columns.map((col, index) => {
           const colMatchesCount = matches.filter(m => m.status === col.status).length;
           const isActive = activeColIndex === index;
@@ -700,7 +828,7 @@ export default function Dashboard() {
               className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 snap-center border ${
                 isActive 
                   ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white border-pink-500/30 shadow-lg shadow-pink-500/20 scale-95'
-                  : 'bg-zinc-900/50 hover:bg-zinc-900 text-zinc-400 border-white/5 hover:text-white'
+                  : 'bg-muted/50 hover:bg-muted text-muted-foreground border-border hover:text-foreground'
               }`}
             >
               <span className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] bg-white/10 text-white font-extrabold">
@@ -708,7 +836,7 @@ export default function Dashboard() {
               </span>
               <span className="tracking-wide">{col.title.replace(/^\d+\.\s*/, '')}</span>
               <Badge variant="outline" className={`h-4 min-w-4 px-1 flex items-center justify-center text-[9px] border-none font-black ${
-                isActive ? 'bg-white/20 text-white animate-pulse' : 'bg-zinc-800 text-zinc-400'
+                isActive ? 'bg-white/20 text-white animate-pulse' : 'bg-muted text-muted-foreground'
               }`}>
                 {colMatchesCount}
               </Badge>
@@ -719,9 +847,11 @@ export default function Dashboard() {
 
       {/* Kanban Columns */}
       <div className="pb-4">
-        {/* Desktop multi-column board (hidden on mobile) */}
-        <div className="hidden md:grid md:grid-cols-5 gap-4 min-w-[1200px] overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-          {columns.map(col => renderColumn(col, false))}
+        {/* Desktop multi-column board (hidden on mobile) - Wrapped in horizontal scroll to prevent bleeding */}
+        <div className="hidden md:block w-full overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0 no-scrollbar">
+          <div className="grid grid-cols-5 gap-4 min-w-[1200px]">
+            {columns.map(col => renderColumn(col, false))}
+          </div>
         </div>
 
         {/* Mobile single-column board (hidden on desktop) */}
@@ -729,6 +859,85 @@ export default function Dashboard() {
           {renderColumn(columns[activeColIndex], true)}
         </div>
       </div>
+
+      {/* Date Scheduling Dialog */}
+      <Dialog open={isScheduleOpen} onOpenChange={setIsScheduleOpen}>
+        <DialogContent className="max-w-none w-full h-[92vh] md:h-auto md:max-w-md fixed bottom-0 md:bottom-auto top-auto md:top-1/2 left-0 md:left-1/2 translate-x-0 md:-translate-x-1/2 translate-y-0 md:-translate-y-1/2 rounded-t-3xl rounded-b-none md:rounded-xl bg-background border-t md:border border-border text-foreground flex flex-col justify-between p-0 shadow-2xl backdrop-blur-3xl transition-all duration-300 ease-out animate-in slide-in-from-bottom-10 md:zoom-in-95">
+          <div className="md:hidden flex justify-center pt-3 pb-1">
+            <div className="w-12 h-1 bg-muted rounded-full" />
+          </div>
+          <DialogHeader className="p-6 pb-0 md:p-6 md:pb-2">
+            <DialogTitle className="text-xl font-bold flex items-center gap-2">
+              <CalendarDays className="h-5 w-5 text-pink-500" /> Schedule Match Date / Consultation
+            </DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleScheduleDateSubmit} className="flex-1 flex flex-col justify-between space-y-4 p-6 pt-2 overflow-hidden">
+            <div className="flex-1 space-y-4 overflow-y-auto pr-1">
+              <p className="text-xs text-muted-foreground leading-relaxed bg-muted p-3.5 rounded-2xl border border-border">
+                Scheduling a date for <strong className="text-foreground">{selectedMatchForDate?.maleName} ({selectedMatchForDate?.gentlemanCode})</strong> and <strong className="text-foreground">{selectedMatchForDate?.femaleName} ({selectedMatchForDate?.ladyCode})</strong>. This will log the date automatically in both profiles' timelines.
+              </p>
+
+              <div className="space-y-2">
+                <Label htmlFor="dateVenue" className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Date Venue / Branch Method</Label>
+                <Select value={dateVenue} onValueChange={(v: any) => setDateVenue(v)}>
+                  <SelectTrigger className="bg-background border-input text-foreground">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent className="bg-popover border-border text-popover-foreground">
+                    <SelectItem value="CAIRO">Cairo Branch / Coffee Meetup</SelectItem>
+                    <SelectItem value="GIZA">Giza Branch / Coffee Meetup</SelectItem>
+                    <SelectItem value="ONLINE">Online Video Interview</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="dateTime" className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Date & Time</Label>
+                <Input 
+                  id="dateTime"
+                  type="datetime-local" 
+                  className="bg-background border-input text-foreground"
+                  value={dateTime}
+                  onChange={(e) => setDateTime(e.target.value)}
+                  required
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="dateNotes" className="text-muted-foreground text-xs font-semibold uppercase tracking-wider">Dating Instructions / Matchmaker Notes</Label>
+                <Textarea 
+                  id="dateNotes" 
+                  placeholder="e.g. Set to meet at Giza Cafe, Karim will bring flowers, Sarah following up..." 
+                  className="bg-background border-input text-foreground min-h-[80px]"
+                  value={dateNotes}
+                  onChange={(e) => setDateNotes(e.target.value)}
+                />
+              </div>
+            </div>
+
+            <DialogFooter className="mt-auto pt-4 border-t border-border flex gap-2 sm:flex-row flex-row-reverse">
+              <Button type="button" variant="outline" className="flex-1 sm:flex-none border-border hover:bg-muted text-foreground active:scale-95 transition-all duration-150" onClick={() => setIsScheduleOpen(false)}>
+                Cancel
+              </Button>
+              <Button type="submit" className="flex-1 sm:flex-none bg-gradient-to-r from-pink-500 to-purple-600 text-white border-0 shadow-lg shadow-pink-500/20 hover:from-pink-600 hover:to-purple-700 active:scale-95 transition-all duration-150 font-semibold">
+                Confirm Date & Log
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Modern custom confirmation dialog for archiving matches, eliminating window.confirm blocking threads */}
+      <ConfirmDialog
+        isOpen={showUnmatchConfirm}
+        onOpenChange={setShowUnmatchConfirm}
+        title="End Match Proposal"
+        description="Are you sure you want to end this match proposal (Archive as Unmatched)? This will remove it from the active match board."
+        onConfirm={confirmUnmatch}
+        confirmText="Archive as Unmatched"
+        cancelText="Cancel"
+        variant="destructive"
+      />
     </div>
   );
 }

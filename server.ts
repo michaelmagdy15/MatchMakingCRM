@@ -3,9 +3,18 @@ import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
 import { createServer as createViteServer } from "vite";
+import dotenv from "dotenv";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+
+// Check if we are running from within dist or project root
+const isDistDir = path.basename(__dirname) === "dist";
+const rootPath = isDistDir ? path.join(__dirname, "..") : __dirname;
+const distPath = isDistDir ? __dirname : path.join(__dirname, "dist");
+
+// Load environment variables from the project's .env file (fallback to project root)
+dotenv.config({ path: path.join(rootPath, ".env") });
 
 async function startServer() {
   const app = express();
@@ -17,25 +26,52 @@ async function startServer() {
     next();
   });
 
+  // Secure environment check endpoint (checks existence of keys, hides raw values)
+  app.get("/api/env-check", (req, res) => {
+    res.json({
+      status: "ok",
+      NODE_ENV: process.env.NODE_ENV || "not-set",
+      has_VITE_SUPABASE_URL: !!process.env.VITE_SUPABASE_URL,
+      has_VITE_SUPABASE_ANON_KEY: !!process.env.VITE_SUPABASE_ANON_KEY,
+      has_SUPABASE_URL: !!process.env.SUPABASE_URL,
+      has_SUPABASE_ANON_KEY: !!process.env.SUPABASE_ANON_KEY,
+    });
+  });
+
   // API routes go here
   app.get("/api/health", (req, res) => {
     res.json({ status: "ok" });
   });
 
-  const distPath = path.join(process.cwd(), "dist");
-  const isProduction = process.env.NODE_ENV === "production" && fs.existsSync(distPath);
+  // Determine if we are running in production mode
+  const isProduction = isDistDir || process.env.NODE_ENV === "production" || fs.existsSync(path.join(distPath, "index.html"));
 
   if (!isProduction) {
     const vite = await createViteServer({
+      root: rootPath,
       server: { middlewareMode: true },
       appType: "spa",
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
     app.get("*", (req, res) => {
-      res.sendFile(path.join(distPath, "index.html"));
+      const htmlPath = path.join(distPath, "index.html");
+      if (fs.existsSync(htmlPath)) {
+        let html = fs.readFileSync(htmlPath, "utf8");
+        
+        // Fallback to non-VITE prefixed environment variables
+        const supabaseUrl = process.env.VITE_SUPABASE_URL || process.env.SUPABASE_URL || "";
+        const supabaseAnonKey = process.env.VITE_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || "";
+        
+        // Dynamically inject variables into the script block
+        html = html.replace("__VITE_SUPABASE_URL__", supabaseUrl);
+        html = html.replace("__VITE_SUPABASE_ANON_KEY__", supabaseAnonKey);
+        
+        res.send(html);
+      } else {
+        res.status(404).send("Not Found");
+      }
     });
   }
 

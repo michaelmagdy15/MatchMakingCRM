@@ -1,7 +1,7 @@
 {
-  "name": "Strike Boxing CRM",
-  "short_name": "Strike CRM",
-  "description": "Premium Boxing CRM and Attendance System",
+  "name": "PureMatch CRM",
+  "short_name": "PureMatch CRM",
+  "description": "Premium Matchmaking CRM and Date Scheduler System",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",
