@@ -3,6 +3,13 @@ import { getAuth, GoogleAuthProvider, signInWithPopup, signOut } from 'firebase/
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from 'firebase/firestore';
 import firebaseConfig from '../firebase-applet-config.json';
 
+export const isFirebaseConfigured = !!(
+  firebaseConfig &&
+  firebaseConfig.projectId &&
+  firebaseConfig.projectId !== 'YOUR_PROJECT_ID' &&
+  !firebaseConfig.projectId.includes('__')
+);
+
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = initializeFirestore(app, {

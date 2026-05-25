@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ShieldCheck, Heart, User, ChevronRight } from 'lucide-react';
-import { isSupabaseConfigured } from './supabase';
+import { isFirebaseConfigured } from './firebase';
 
 export default function Login() {
   const { login, isAuthReady } = useAppContext();
@@ -59,9 +59,9 @@ export default function Login() {
           Matchmaking & Dating Admin Dashboard
         </p>
         <div className="mt-3 inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-zinc-900 border border-zinc-800/80">
-          <span className={`h-2 w-2 rounded-full ${isSupabaseConfigured ? 'bg-emerald-500 shadow-emerald-500/50' : 'bg-amber-500 shadow-amber-500/50'} animate-ping`} />
+          <span className={`h-2 w-2 rounded-full ${isFirebaseConfigured ? 'bg-emerald-500 shadow-emerald-500/50' : 'bg-amber-500 shadow-amber-500/50'} animate-ping`} />
           <span className="text-zinc-300">
-            {isSupabaseConfigured ? 'Supabase Database Connected' : 'Local Sandbox Mode (Safe)'}
+            {isFirebaseConfigured ? 'Live Firestore Database Connected' : 'Local Sandbox Mode (Safe)'}
           </span>
         </div>
       </div>

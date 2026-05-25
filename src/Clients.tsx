@@ -38,6 +38,7 @@ import {
   BadgeAlert,
   Download,
   ShieldCheck,
+  Check,
   ExternalLink
 } from 'lucide-react';
 import { Client, InteractionType, InteractionOutcome, ClientStatus } from './types';
@@ -347,6 +348,16 @@ export default function Clients() {
       (mm: any) => mm.clientId === candidate.id
     );
 
+    const handleUpdateStatus = async (nextStatus: ClientStatus, statusLabel: string) => {
+      try {
+        await updateClient(candidate.id, { status: nextStatus });
+        const adminName = currentUser?.name || 'Admin';
+        await addComment(candidate.id, `[ADMIN REVIEW] Candidate profile status updated to ${statusLabel} by ${adminName}.`, adminName);
+      } catch (err: any) {
+        alert('Failed to update status: ' + err.message);
+      }
+    };
+
     return (
       <DialogContent className="w-[95vw] max-w-[1000px] sm:max-w-[90vw] md:max-w-[1000px] max-h-[90vh] overflow-hidden flex flex-col p-0 border border-white/10 bg-zinc-900/90 backdrop-blur-xl text-white shadow-2xl rounded-2xl shadow-black/80">
         <DialogHeader className="p-6 border-b border-white/5 bg-zinc-900/40 flex flex-row items-center justify-between">
@@ -531,6 +542,79 @@ export default function Clients() {
 
             {/* Right Bento: Admin / Audit Metrics & Secret Notes */}
             <div className="space-y-6">
+              {/* Admin Review Action Panel */}
+              <Card className="bg-zinc-950/90 border-pink-500/20 p-4 rounded-xl space-y-4 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-24 h-24 bg-pink-500/5 rounded-full blur-2xl pointer-events-none" />
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-black uppercase text-pink-400 tracking-wider flex items-center gap-2">
+                    <ShieldCheck className="h-4 w-4" /> Profile Signup Review
+                  </h4>
+                  <Badge variant="outline" className={`text-[10px] ${
+                    candidate.status === 'Approved' || candidate.status === 'Active' 
+                      ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                      : candidate.status === 'Pending' || candidate.status === 'Pending Review'
+                      ? 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20'
+                      : candidate.status === 'Rejected'
+                      ? 'bg-rose-500/10 text-rose-500 border-rose-500/20'
+                      : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                  }`}>
+                    {candidate.status === 'Pending' ? 'Pending Review' : candidate.status}
+                  </Badge>
+                </div>
+                
+                <p className="text-[11px] text-zinc-400 leading-normal">
+                  Review the candidate's signup metrics, religion, and location before approving their eligibility to enter the active matchmaking directory.
+                </p>
+
+                <div className="space-y-2 pt-1">
+                  {candidate.status !== 'Approved' && candidate.status !== 'Active' ? (
+                    <Button 
+                      onClick={() => handleUpdateStatus('Approved', 'Approved')}
+                      className="w-full bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-extrabold h-9 rounded-xl text-xs flex items-center justify-center gap-1.5 shadow-md shadow-emerald-950/20"
+                    >
+                      <Check className="h-4 w-4" /> Approve & Activate Profile
+                    </Button>
+                  ) : (
+                    <div className="bg-emerald-500/5 border border-emerald-500/20 p-2.5 rounded-lg text-emerald-400 text-center text-xs font-semibold flex items-center justify-center gap-1.5">
+                      <Check className="h-4 w-4 text-emerald-400" /> Active in Matchmaking Directory
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <Button 
+                      variant="outline" 
+                      onClick={() => handleUpdateStatus('Hold', 'On Hold')}
+                      disabled={candidate.status === 'Hold'}
+                      className={`h-8 border-white/5 text-[10px] font-bold rounded-lg ${
+                        candidate.status === 'Hold' ? 'text-zinc-650 bg-zinc-900/10' : 'text-zinc-400 hover:bg-zinc-900 hover:text-white'
+                      }`}
+                    >
+                      Put on Hold
+                    </Button>
+                    <Button 
+                      variant="outline" 
+                      onClick={() => handleUpdateStatus('Rejected', 'Rejected')}
+                      disabled={candidate.status === 'Rejected'}
+                      className={`h-8 border-white/5 text-[10px] font-bold rounded-lg ${
+                        candidate.status === 'Rejected' ? 'text-zinc-650 bg-zinc-900/10' : 'text-zinc-400 hover:bg-rose-950/30 hover:text-rose-400'
+                      }`}
+                    >
+                      Reject Profile
+                    </Button>
+                  </div>
+                  
+                  {(candidate.status === 'Rejected' || candidate.status === 'Hold') && (
+                    <Button
+                      variant="ghost"
+                      onClick={() => handleUpdateStatus('Pending', 'Pending Review')}
+                      className="w-full h-7 text-[9px] uppercase tracking-widest text-zinc-500 hover:text-zinc-300 font-bold"
+                    >
+                      Reset to Pending Review
+                    </Button>
+                  )}
+                </div>
+              </Card>
+
               {/* RLS Masked Sensitive Card */}
               <Card className="bg-zinc-950/80 border-amber-500/20 p-4 rounded-xl space-y-3 relative overflow-hidden">
                 <div className="absolute top-0 right-0 w-24 h-24 bg-amber-500/5 rounded-full blur-2xl pointer-events-none" />

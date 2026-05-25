@@ -104,6 +104,12 @@ service cloud.firestore {
              data.status in ["Lead", "Active", "Nearly Expired", "Expired", "Hold"];
     }
 
+    function isValidMatchClient(data) {
+      return data.name is string && data.name.size() > 0 &&
+             data.phone is string && data.phone.size() > 0 &&
+             data.status in ["Approved", "Pending Review", "Hold", "Lead", "Active", "Nearly Expired", "Expired"];
+    }
+
     function isValidPayment(data) {
       return data.clientId is string &&
              data.amount_paid is number && data.amount_paid >= 0 &&
@@ -227,6 +233,25 @@ service cloud.firestore {
     }
 
     // ===============================================================
+    // Gamen Brand Shop Rules
+    // ===============================================================
+    match /gamen_products/{productId} {
+      allow read, write: if true;
+    }
+
+    match /gamen_traffic/{trafficId} {
+      allow read, write: if true;
+    }
+
+    match /gamen_subscribers/{subId} {
+      allow read, write: if true;
+    }
+
+    match /gamen_mail/{mailId} {
+      allow read, write: if true;
+    }
+
+    // ===============================================================
     // Duplicated Rules for Prefixed collections (match_*)
     // ===============================================================
 
@@ -237,9 +262,9 @@ service cloud.firestore {
       allow delete: if isMatchAdmin();
     }
 
-    match /match_clients/{clientId} {
+    match /match_profiles/{profileId} {
       allow read: if isAuthenticated();
-      allow create: if isAuthenticated() && isValidClient(request.resource.data);
+      allow create: if isAuthenticated() && isValidMatchClient(request.resource.data);
       allow update: if isAuthenticated();
       allow delete: if isMatchAdmin();
     }
@@ -265,7 +290,7 @@ service cloud.firestore {
       allow read, write: if isAuthenticated();
     }
 
-    match /match_auditLogs/{logId} {
+    match /match_audit_logs/{logId} {
       allow read: if canMatchAccessSettings();
       allow create: if isAuthenticated();
       allow delete: if canMatchAccessSettings();

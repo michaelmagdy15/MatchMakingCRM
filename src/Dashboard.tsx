@@ -27,7 +27,7 @@ import {
   BookmarkCheck
 } from 'lucide-react';
 import { MatchStatus, Match, Client } from './types';
-import { isSupabaseConfigured } from './supabase';
+import { isFirebaseConfigured } from './firebase';
 import { ConfirmDialog } from './components/ConfirmDialog';
 
 export default function Dashboard() {
@@ -90,6 +90,108 @@ export default function Dashboard() {
   const ladies = profiles.filter(
     p => (p.gender?.toLowerCase() === 'lady' || p.gender?.toLowerCase() === 'female') && p.status === 'Active'
   );
+
+  const selectedGentleman = profiles.find(p => p.id === selectedGentlemanId);
+  const selectedLady = profiles.find(p => p.id === selectedLadyId);
+
+  const compatibilityReport = React.useMemo(() => {
+    if (!selectedGentleman || !selectedLady) return null;
+
+    // Helper to parse age range preferences
+    const parseAgeRange = (rangeStr?: string) => {
+      if (!rangeStr) return { min: 0, max: 100 };
+      const clean = rangeStr.toLowerCase().trim();
+      if (clean === 'any' || clean === 'open') return { min: 0, max: 100 };
+      
+      // Look for format like "25-30" or "25 to 30"
+      const match = clean.match(/(\d+)\s*(?:-|to)\s*(\d+)/);
+      if (match) {
+        return { min: parseInt(match[1]), max: parseInt(match[2]) };
+      }
+      
+      // Look for format like "under 30"
+      const underMatch = clean.match(/under\s*(\d+)/);
+      if (underMatch) {
+        return { min: 0, max: parseInt(underMatch[1]) };
+      }
+      
+      // Look for format like "above 30" or "30+"
+      const aboveMatch = clean.match(/(?:above\s*|(\d+)\s*\+)/);
+      if (aboveMatch) {
+        const val = parseInt(aboveMatch[1] || clean.match(/above\s*(\d+)/)?.[1] || '30');
+        return { min: val, max: 100 };
+      }
+
+      return { min: 0, max: 100 };
+    };
+
+    // 1. Religion Match
+    const relGentleman = (selectedGentleman.religion || '').toLowerCase().trim();
+    const relLady = (selectedLady.religion || '').toLowerCase().trim();
+    const religionMatch = relGentleman === relLady && relGentleman.length > 0;
+
+    // 2. Age Preference Match
+    const gentAgePref = parseAgeRange(selectedGentleman.preferredAgeRange || selectedGentleman.ageRangePartnerPreferences);
+    const ladyAgePref = parseAgeRange(selectedLady.preferredAgeRange || selectedLady.ageRangePartnerPreferences);
+    
+    const gentAge = selectedGentleman.age || selectedGentleman.finalAge || 0;
+    const ladyAge = selectedLady.age || selectedLady.finalAge || 0;
+
+    const ladyAgeCompatible = ladyAge >= gentAgePref.min && ladyAge <= gentAgePref.max;
+    const gentAgeCompatible = gentAge >= ladyAgePref.min && gentAge <= ladyAgePref.max;
+    const ageMatch = ladyAgeCompatible && gentAgeCompatible;
+
+    // 3. Location & Relocation Match
+    const locGent = (selectedGentleman.locationOfResidence || '').toLowerCase().trim();
+    const locLady = (selectedLady.locationOfResidence || '').toLowerCase().trim();
+    const sameLocation = locGent === locLady && locGent.length > 0;
+    const willingToRelocate = 
+      (selectedGentleman.willingToRelocate || '').toLowerCase() === 'yes' || 
+      (selectedLady.willingToRelocate || '').toLowerCase() === 'yes';
+    const locationMatch = sameLocation || willingToRelocate;
+
+    // 4. Hijab Preference Match
+    const ladyHijab = (selectedLady.hijabPreference || '').toLowerCase().trim();
+    const gentHijabPref = (selectedGentleman.hijabPreference || '').toLowerCase().trim();
+    
+    let hijabMatch = true;
+    if (gentHijabPref.length > 0 && ladyHijab.length > 0) {
+      if (gentHijabPref === 'hijab') {
+        hijabMatch = ladyHijab === 'hijab';
+      } else if (gentHijabPref === 'no hijab') {
+        hijabMatch = ladyHijab === 'no hijab' || ladyHijab === 'no-hijab';
+      }
+    }
+
+    // Calculate score
+    let checkedCount = 4;
+    let matchCount = 0;
+    if (religionMatch) matchCount++;
+    if (ageMatch) matchCount++;
+    if (locationMatch) matchCount++;
+    if (hijabMatch) matchCount++;
+
+    const percent = Math.round((matchCount / checkedCount) * 100);
+
+    return {
+      religionMatch,
+      ageMatch,
+      locationMatch,
+      hijabMatch,
+      percent,
+      sameLocation,
+      willingToRelocate,
+      ladyAgeCompatible,
+      gentAgeCompatible,
+      gentAge,
+      ladyAge,
+      gentAgePref,
+      ladyAgePref,
+      ladyHijab,
+      gentHijabPref,
+      religionName: selectedGentleman.religion || 'Same Religion'
+    };
+  }, [selectedGentleman, selectedLady]);
 
   // Stats calculation
   const totalProfilesCount = profiles.length;
@@ -287,9 +389,9 @@ export default function Dashboard() {
   // Group Matches by Status Columns
   const columns: { title: string; status: MatchStatus; desc: string; bg: string; border: string; accent: string }[] = [
     { 
-      title: '1. Text Profile Review', 
+      title: '1. Portal Text Review', 
       status: MatchStatus.PENDING_PROFILE_APPROVAL,
-      desc: 'Admins reviewing mutual profile texts', 
+      desc: 'Candidates approving texts in portal', 
       bg: 'bg-indigo-950/20', 
       border: 'border-indigo-500/20',
       accent: 'indigo'
@@ -297,7 +399,7 @@ export default function Dashboard() {
     { 
       title: '2. Photo Swap Approval', 
       status: MatchStatus.PENDING_PHOTO_APPROVAL,
-      desc: 'Candidates approved text, swapping photos', 
+      desc: 'Candidates swapping photos in portal', 
       bg: 'bg-pink-950/20', 
       border: 'border-pink-500/20',
       accent: 'pink'
@@ -305,7 +407,7 @@ export default function Dashboard() {
     { 
       title: '3. Contact Share', 
       status: MatchStatus.PENDING_CONTACT_SHARE,
-      desc: 'Awaiting phone/link release permission', 
+      desc: 'Candidates releasing contact in portal', 
       bg: 'bg-amber-950/20', 
       border: 'border-amber-500/20',
       accent: 'amber'
@@ -395,78 +497,129 @@ export default function Dashboard() {
                   {/* Phase Actions State Machine */}
                   <div className="bg-zinc-900/50 p-2 rounded-lg border border-white/5 space-y-2">
                     {match.status === MatchStatus.PENDING_PROFILE_APPROVAL && (
-                      <div className="space-y-1.5">
-                        <span className="text-[9px] uppercase tracking-wider text-zinc-500 font-bold">1. Text Approvals</span>
-                        <div className="grid grid-cols-2 gap-1.5">
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center text-[9px] uppercase tracking-wider text-zinc-550 font-bold border-b border-white/5 pb-1">
+                          <span>1. Portal Text Reviews</span>
+                          <span className="text-[8px] text-zinc-600">Phase 1</span>
+                        </div>
+                        <div className="space-y-1 text-[10px] text-zinc-400">
+                          <div className="flex justify-between items-center">
+                            <span>Gentleman ({match.gentlemanCode}):</span>
+                            <span className={match.maleProfileApproved ? "text-emerald-450 font-bold" : "text-amber-500 font-medium"}>
+                              {match.maleProfileApproved ? "✓ Approved" : "⏳ Awaiting Portal"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center pb-1">
+                            <span>Lady ({match.ladyCode}):</span>
+                            <span className={match.femaleProfileApproved ? "text-emerald-450 font-bold" : "text-amber-500 font-medium"}>
+                              {match.femaleProfileApproved ? "✓ Approved" : "⏳ Awaiting Portal"}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5 pt-0.5">
                           <Button 
                             size="sm" 
                             variant={match.maleProfileApproved ? 'default' : 'outline'}
-                            className={`h-7 text-[10px] px-1 transition-all ${match.maleProfileApproved ? 'bg-indigo-600 hover:bg-indigo-700 text-white font-bold' : 'border-white/5 text-zinc-400 hover:bg-zinc-900'}`}
+                            className={`h-6 text-[9px] px-1 transition-all ${match.maleProfileApproved ? 'bg-indigo-950 text-indigo-400 border border-indigo-500/20 font-bold' : 'border-white/5 text-zinc-550 hover:bg-zinc-900 hover:text-zinc-300'}`}
                             onClick={() => toggleMaleProfileApprove(match)}
+                            title="Admin Override Gentleman Text Approval"
                           >
-                            <Check className="h-3 w-3 mr-1" />
-                            {match.gentlemanCode} Profile
+                            {match.maleProfileApproved ? "Override Active" : "Override Gent"}
                           </Button>
                           <Button 
                             size="sm" 
                             variant={match.femaleProfileApproved ? 'default' : 'outline'}
-                            className={`h-7 text-[10px] px-1 transition-all ${match.femaleProfileApproved ? 'bg-pink-600 hover:bg-pink-700 text-white font-bold' : 'border-white/5 text-zinc-400 hover:bg-zinc-900'}`}
+                            className={`h-6 text-[9px] px-1 transition-all ${match.femaleProfileApproved ? 'bg-pink-950 text-pink-400 border border-pink-500/20 font-bold' : 'border-white/5 text-zinc-550 hover:bg-zinc-900 hover:text-zinc-300'}`}
                             onClick={() => toggleFemaleProfileApprove(match)}
+                            title="Admin Override Lady Text Approval"
                           >
-                            <Check className="h-3 w-3 mr-1" />
-                            {match.ladyCode} Profile
+                            {match.femaleProfileApproved ? "Override Active" : "Override Lady"}
                           </Button>
                         </div>
                       </div>
                     )}
 
                     {match.status === MatchStatus.PENDING_PHOTO_APPROVAL && (
-                      <div className="space-y-1.5">
-                        <span className="text-[9px] uppercase tracking-wider text-zinc-500 font-bold">2. Photo Approvals</span>
-                        <div className="grid grid-cols-2 gap-1.5">
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center text-[9px] uppercase tracking-wider text-zinc-555 font-bold border-b border-white/5 pb-1">
+                          <span>2. Portal Photo Swaps</span>
+                          <span className="text-[8px] text-zinc-600">Phase 2</span>
+                        </div>
+                        <div className="space-y-1 text-[10px] text-zinc-400">
+                          <div className="flex justify-between items-center">
+                            <span>Gentleman ({match.gentlemanCode}):</span>
+                            <span className={match.malePhotoApproved ? "text-emerald-450 font-bold" : "text-amber-500 font-medium"}>
+                              {match.malePhotoApproved ? "✓ Photo Swapped" : "⏳ Awaiting Photo"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center pb-1">
+                            <span>Lady ({match.ladyCode}):</span>
+                            <span className={match.femalePhotoApproved ? "text-emerald-450 font-bold" : "text-amber-500 font-medium"}>
+                              {match.femalePhotoApproved ? "✓ Photo Swapped" : "⏳ Awaiting Photo"}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5 pt-0.5">
                           <Button 
                             size="sm" 
                             variant={match.malePhotoApproved ? 'default' : 'outline'}
-                            className={`h-7 text-[10px] px-1 transition-all ${match.malePhotoApproved ? 'bg-indigo-600 hover:bg-indigo-700 text-white font-bold' : 'border-white/5 text-zinc-400 hover:bg-zinc-900'}`}
+                            className={`h-6 text-[9px] px-1 transition-all ${match.malePhotoApproved ? 'bg-indigo-950 text-indigo-400 border border-indigo-500/20 font-bold' : 'border-white/5 text-zinc-550 hover:bg-zinc-900 hover:text-zinc-300'}`}
                             onClick={() => toggleMalePhotoApprove(match)}
+                            title="Admin Override Gentleman Photo Swap Approval"
                           >
-                            <Check className="h-3 w-3 mr-1" />
-                            {match.gentlemanCode} Photo
+                            {match.malePhotoApproved ? "Override Active" : "Override Gent"}
                           </Button>
                           <Button 
                             size="sm" 
                             variant={match.femalePhotoApproved ? 'default' : 'outline'}
-                            className={`h-7 text-[10px] px-1 transition-all ${match.femalePhotoApproved ? 'bg-pink-600 hover:bg-pink-700 text-white font-bold' : 'border-white/5 text-zinc-400 hover:bg-zinc-900'}`}
+                            className={`h-6 text-[9px] px-1 transition-all ${match.femalePhotoApproved ? 'bg-pink-950 text-pink-400 border border-pink-500/20 font-bold' : 'border-white/5 text-zinc-550 hover:bg-zinc-900 hover:text-zinc-300'}`}
                             onClick={() => toggleFemalePhotoApprove(match)}
+                            title="Admin Override Lady Photo Swap Approval"
                           >
-                            <Check className="h-3 w-3 mr-1" />
-                            {match.ladyCode} Photo
+                            {match.femalePhotoApproved ? "Override Active" : "Override Lady"}
                           </Button>
                         </div>
                       </div>
                     )}
 
                     {match.status === MatchStatus.PENDING_CONTACT_SHARE && (
-                      <div className="space-y-1.5">
-                        <span className="text-[9px] uppercase tracking-wider text-zinc-500 font-bold">3. Contact Share Approvals</span>
-                        <div className="grid grid-cols-2 gap-1.5">
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center text-[9px] uppercase tracking-wider text-zinc-555 font-bold border-b border-white/5 pb-1">
+                          <span>3. Portal Contact Releases</span>
+                          <span className="text-[8px] text-zinc-600">Phase 3</span>
+                        </div>
+                        <div className="space-y-1 text-[10px] text-zinc-400">
+                          <div className="flex justify-between items-center">
+                            <span>Gentleman ({match.gentlemanCode}):</span>
+                            <span className={match.maleContactApproved ? "text-emerald-450 font-bold" : "text-amber-500 font-medium"}>
+                              {match.maleContactApproved ? "✓ Released Ok" : "⏳ Awaiting Portal"}
+                            </span>
+                          </div>
+                          <div className="flex justify-between items-center pb-1">
+                            <span>Lady ({match.ladyCode}):</span>
+                            <span className={match.femaleContactApproved ? "text-emerald-450 font-bold" : "text-amber-500 font-medium"}>
+                              {match.femaleContactApproved ? "✓ Released Ok" : "⏳ Awaiting Portal"}
+                            </span>
+                          </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-1.5 pt-0.5">
                           <Button 
                             size="sm" 
                             variant={match.maleContactApproved ? 'default' : 'outline'}
-                            className={`h-7 text-[10px] px-1 transition-all ${match.maleContactApproved ? 'bg-indigo-600 hover:bg-indigo-700 text-white font-bold' : 'border-white/5 text-zinc-400 hover:bg-zinc-900'}`}
+                            className={`h-6 text-[9px] px-1 transition-all ${match.maleContactApproved ? 'bg-indigo-950 text-indigo-400 border border-indigo-500/20 font-bold' : 'border-white/5 text-zinc-555 hover:bg-zinc-900 hover:text-zinc-300'}`}
                             onClick={() => toggleMaleContactApprove(match)}
+                            title="Admin Override Gentleman Contact release"
                           >
-                            <Check className="h-3 w-3 mr-1" />
-                            {match.gentlemanCode} Ok
+                            {match.maleContactApproved ? "Override Active" : "Override Gent"}
                           </Button>
                           <Button 
                             size="sm" 
                             variant={match.femaleContactApproved ? 'default' : 'outline'}
-                            className={`h-7 text-[10px] px-1 transition-all ${match.femaleContactApproved ? 'bg-pink-600 hover:bg-pink-700 text-white font-bold' : 'border-white/5 text-zinc-400 hover:bg-zinc-900'}`}
+                            className={`h-6 text-[9px] px-1 transition-all ${match.femaleContactApproved ? 'bg-pink-950 text-pink-400 border border-pink-500/20 font-bold' : 'border-white/5 text-zinc-555 hover:bg-zinc-900 hover:text-zinc-300'}`}
                             onClick={() => toggleFemaleContactApprove(match)}
+                            title="Admin Override Lady Contact release"
                           >
-                            <Check className="h-3 w-3 mr-1" />
-                            {match.ladyCode} Ok
+                            {match.femaleContactApproved ? "Override Active" : "Override Lady"}
                           </Button>
                         </div>
                       </div>
@@ -625,9 +778,9 @@ export default function Dashboard() {
             <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white flex items-center gap-2">
               Match Control Center <Sparkles className="h-5 w-5 text-pink-400 animate-pulse" />
             </h2>
-            <Badge variant="outline" className={`text-xs flex items-center gap-1.5 ${isSupabaseConfigured ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
+            <Badge variant="outline" className={`text-xs flex items-center gap-1.5 ${isFirebaseConfigured ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-amber-500/10 text-amber-400 border-amber-500/20'}`}>
               <Database className="h-3 w-3" />
-              {isSupabaseConfigured ? 'Supabase Connected' : 'Local Sandbox Database'}
+              {isFirebaseConfigured ? 'Live Firestore Connected' : 'Local Sandbox Database'}
             </Badge>
           </div>
           <p className="text-xs sm:text-sm text-zinc-400">
@@ -698,6 +851,142 @@ export default function Dashboard() {
                     </SelectContent>
                   </Select>
                 </div>
+
+                {compatibilityReport && (
+                  <Card className={`border p-4 rounded-xl space-y-3 relative overflow-hidden transition-all duration-500 bg-zinc-950/90 ${
+                    compatibilityReport.percent >= 75 
+                      ? 'border-emerald-500/20 shadow-lg shadow-emerald-950/10'
+                      : compatibilityReport.percent >= 50
+                      ? 'border-amber-500/20 shadow-lg shadow-amber-950/10'
+                      : 'border-rose-500/20 shadow-lg shadow-rose-950/10'
+                  }`}>
+                    {/* Glowing background gradient reflecting compatibility level */}
+                    <div className={`absolute top-0 right-0 w-24 h-24 rounded-full blur-2xl pointer-events-none opacity-20 ${
+                      compatibilityReport.percent >= 75 ? 'bg-emerald-500' : compatibilityReport.percent >= 50 ? 'bg-amber-500' : 'bg-rose-500'
+                    }`} />
+                    
+                    <div className="flex justify-between items-center">
+                      <span className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Compatibility Audit</span>
+                      <Badge className={`text-xs font-black px-2.5 py-0.5 rounded-lg border flex items-center gap-1 ${
+                        compatibilityReport.percent === 100 
+                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25 animate-pulse'
+                          : compatibilityReport.percent >= 75
+                          ? 'bg-teal-500/10 text-teal-400 border-teal-500/25'
+                          : compatibilityReport.percent >= 50
+                          ? 'bg-amber-500/10 text-amber-400 border-amber-500/25'
+                          : 'bg-rose-500/10 text-rose-400 border-rose-500/25'
+                      }`}>
+                        {compatibilityReport.percent}% {
+                          compatibilityReport.percent === 100 
+                            ? 'Perfect Match!' 
+                            : compatibilityReport.percent >= 75
+                            ? 'Strong Match'
+                            : compatibilityReport.percent >= 50
+                            ? 'Moderate Match'
+                            : 'Low Match'
+                        }
+                      </Badge>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-2 pt-1 text-[11px]">
+                      {/* 1. Religion check */}
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-900/40 border border-white/5">
+                        <span className="text-zinc-400 flex items-center gap-1">Religion</span>
+                        <div className="flex items-center gap-1 font-bold">
+                          {compatibilityReport.religionMatch ? (
+                            <>
+                              <span className="text-emerald-450">Match</span>
+                              <Check className="h-3 w-3 text-emerald-400" />
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-rose-400">Mismatch</span>
+                              <X className="h-3 w-3 text-rose-450" />
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 2. Age Range check */}
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-900/40 border border-white/5" title={`Gentleman (${compatibilityReport.gentAge}y) Pref: ${selectedGentleman?.preferredAgeRange || 'Any'}. Lady (${compatibilityReport.ladyAge}y) Pref: ${selectedLady?.preferredAgeRange || 'Any'}.`}>
+                        <span className="text-zinc-400 flex items-center gap-1">Age Pref</span>
+                        <div className="flex items-center gap-1 font-bold">
+                          {compatibilityReport.ageMatch ? (
+                            <>
+                              <span className="text-emerald-450">Match</span>
+                              <Check className="h-3 w-3 text-emerald-400" />
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-rose-400">Mismatch</span>
+                              <X className="h-3 w-3 text-rose-450" />
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 3. Location / Relocation check */}
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-900/40 border border-white/5" title={`Gentleman: ${selectedGentleman?.locationOfResidence || 'N/A'} (Relocate: ${selectedGentleman?.willingToRelocate || 'No'}). Lady: ${selectedLady?.locationOfResidence || 'N/A'} (Relocate: ${selectedLady?.willingToRelocate || 'No'}).`}>
+                        <span className="text-zinc-400 flex items-center gap-1">Location</span>
+                        <div className="flex items-center gap-1 font-bold">
+                          {compatibilityReport.locationMatch ? (
+                            <>
+                              <span className="text-emerald-450">Match</span>
+                              <Check className="h-3 w-3 text-emerald-400" />
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-rose-400">Mismatch</span>
+                              <X className="h-3 w-3 text-rose-450" />
+                            </>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* 4. Hijab Preference check */}
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-900/40 border border-white/5" title={`Gentleman Pref: ${selectedGentleman?.hijabPreference || 'Doesn\'t matter'}. Lady Status: ${selectedLady?.hijabPreference || 'No Hijab'}.`}>
+                        <span className="text-zinc-400 flex items-center gap-1">Hijab Pref</span>
+                        <div className="flex items-center gap-1 font-bold">
+                          {compatibilityReport.hijabMatch ? (
+                            <>
+                              <span className="text-emerald-450">Match</span>
+                              <Check className="h-3 w-3 text-emerald-400" />
+                            </>
+                          ) : (
+                            <>
+                              <span className="text-rose-400">Mismatch</span>
+                              <X className="h-3 w-3 text-rose-450" />
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Descriptive breakdown matching text */}
+                    <div className="text-[10px] text-zinc-400 leading-relaxed bg-zinc-900/20 p-2 rounded border border-white/5 font-mono">
+                      {compatibilityReport.percent === 100 && (
+                        <span>✨ Both candidates satisfy all core checklist values. Excellent baseline matching score.</span>
+                      )}
+                      {compatibilityReport.percent === 75 && (
+                        <span>✓ Strong alignment. {
+                          !compatibilityReport.ageMatch 
+                            ? 'Slight age criteria mismatch.' 
+                            : !compatibilityReport.locationMatch 
+                            ? 'Location mismatch (neither willing to relocate).' 
+                            : !compatibilityReport.hijabMatch 
+                            ? 'Hijab preference mismatch.'
+                            : 'Minor religion mismatch.'
+                        } Proceeding is recommended.</span>
+                      )}
+                      {compatibilityReport.percent === 50 && (
+                        <span>⚠️ Moderate match. 2 of 4 baseline criteria are mismatching. Double check with both candidates.</span>
+                      )}
+                      {compatibilityReport.percent < 50 && (
+                        <span>❌ High mismatch warning. Low compatibility. Re-evaluate profile selections before proposing.</span>
+                      )}
+                    </div>
+                  </Card>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="notes" className="text-zinc-300 text-xs font-semibold uppercase tracking-wider">Proposal Context & Notes</Label>

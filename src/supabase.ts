@@ -25,6 +25,4 @@ export const supabase = isSupabaseConfigured
 
 if (isSupabaseConfigured) {
   console.log('Matchmaking CRM: Supabase Client initialized successfully.', { supabaseUrl });
-} else {
-  console.warn('Matchmaking CRM: Supabase is not configured. Running in Sandbox Mode with Local Browser Storage.');
 }

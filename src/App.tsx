@@ -16,7 +16,6 @@ import Settings from './Settings';
 import Login from './Login';
 import Reports from './Reports';
 import Portal from './Portal';
-import Leads from './Leads';
 import { 
   Activity, 
   Users, 
@@ -93,9 +92,6 @@ function AppContent() {
   // Filtered navigation list based on permissions
   const navigationItems = [
     { value: 'dashboard', label: 'Match Control', icon: Activity },
-    ...(currentUser.role === 'manager' || currentUser.role === 'rep' || currentUser.role === 'admin' || currentUser.role === 'super_admin' || currentUser.role === 'crm_admin' ? [
-      { value: 'leads', label: 'Matchees Review', icon: UserPlus }
-    ] : []),
     { value: 'clients', label: 'Profiles Directory', icon: Users },
     ...(currentUser.role !== 'admin' ? [
       { value: 'tasks', label: 'Match Progress', icon: CheckSquare }
@@ -369,12 +365,6 @@ function AppContent() {
           <TabsContent value="dashboard" className="m-0 animate-in fade-in-50 duration-500">
             <Dashboard />
           </TabsContent>
-
-          {(currentUser.role === 'manager' || currentUser.role === 'rep' || currentUser.role === 'admin' || currentUser.role === 'super_admin' || currentUser.role === 'crm_admin') && (
-            <TabsContent value="leads" className="m-0 animate-in fade-in-50 duration-500">
-              <Leads />
-            </TabsContent>
-          )}
 
           <TabsContent value="clients" className="m-0 animate-in fade-in-50 duration-500">
             <Clients />

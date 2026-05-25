@@ -249,7 +249,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ...snakeToCamel(data)
         } as User;
       });
-      setUsers(firestoreUsers.length > 0 ? firestoreUsers : MOCK_USERS);
+      setUsers(firestoreUsers);
 
       // Fetch Profiles
       const profilesSnapshot = await getDocs(collection(db, 'match_profiles'));
@@ -260,7 +260,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           ...snakeToCamel(data)
         } as Client;
       });
-      setBaseClients(firestoreProfiles.length > 0 ? firestoreProfiles : mockClients);
+      setBaseClients(firestoreProfiles);
 
       // Fetch Matches
       const matchesSnapshot = await getDocs(collection(db, 'match_matches'));
@@ -274,7 +274,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
           date: camel.date || camel.createdAt || new Date().toISOString()
         } as Match;
       });
-      setBaseMatches(firestoreMatches.length > 0 ? firestoreMatches : mockMatches);
+      setBaseMatches(firestoreMatches);
 
       // Fetch Tasks
       const tasksSnapshot = await getDocs(collection(db, 'match_tasks'));
@@ -346,15 +346,15 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       console.error('Error fetching Firestore data:', error);
       // Fallback to local storage
       const loadedUsers = localStorage.getItem(STORAGE_KEYS.USERS);
-      setUsers(loadedUsers ? JSON.parse(loadedUsers) : MOCK_USERS);
+      setUsers(loadedUsers ? JSON.parse(loadedUsers) : []);
 
       const loadedProfiles = localStorage.getItem(STORAGE_KEYS.PROFILES);
       const parsedProfiles = loadedProfiles ? JSON.parse(loadedProfiles) : [];
-      setBaseClients(parsedProfiles.length > 0 ? parsedProfiles : mockClients);
+      setBaseClients(parsedProfiles);
 
       const loadedMatches = localStorage.getItem(STORAGE_KEYS.MATCHES);
       const parsedMatches = loadedMatches ? JSON.parse(loadedMatches) : [];
-      setBaseMatches(parsedMatches.length > 0 ? parsedMatches : mockMatches);
+      setBaseMatches(parsedMatches);
 
       const loadedTasks = localStorage.getItem(STORAGE_KEYS.TASKS);
       setTasks(loadedTasks ? JSON.parse(loadedTasks) : []);
