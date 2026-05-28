@@ -39,8 +39,12 @@ import {
   ChevronRight,
   Menu,
   X,
-  User
+  User,
+  MessageCircle,
+  Sparkles
 } from 'lucide-react';
+import AdminChatHub from './components/AdminChatHub';
+import AdminAnnouncements from './components/AdminAnnouncements';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -48,7 +52,7 @@ import { Badge } from '@/components/ui/badge';
 import { NotificationCenter } from './components/NotificationCenter';
 
 function AppContent() {
-  const { currentUser, logout, isAuthReady, previewRole, setPreviewRole, searchQuery, setSearchQuery, branding, canAccessSettings, canViewGlobalDashboard, canDeletePayments, isManagerOrAdmin } = useAppContext();
+  const { currentUser, logout, isAuthReady, previewRole, setPreviewRole, searchQuery, setSearchQuery, branding, canAccessSettings, canViewGlobalDashboard, canDeletePayments, isManagerOrAdmin, isDataLoading } = useAppContext();
 
   const [theme, setTheme] = React.useState<'dark' | 'light'>(() => {
     const saved = localStorage.getItem('crm-theme');
@@ -72,10 +76,35 @@ function AppContent() {
 
   const toggleTheme = () => setTheme((prev) => (prev === 'dark' ? 'light' : 'dark'));
 
-  if (!isAuthReady) {
+  if (!isAuthReady || isDataLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-gradient-to-tr from-[oklch(0.98_0.01_250)] via-[oklch(0.96_0.01_220)] to-[oklch(0.97_0.02_280)] dark:from-[oklch(0.12_0.02_250)] dark:via-[oklch(0.08_0.01_220)] dark:to-[oklch(0.14_0.03_280)] font-sans">
+        {/* Full-screen glassmorphic card container */}
+        <div className="relative flex flex-col items-center p-12 bg-white/20 dark:bg-black/20 border border-white/30 dark:border-white/5 rounded-3xl shadow-2xl backdrop-blur-2xl max-w-sm w-full mx-4 text-center animate-in fade-in-50 zoom-in-95 duration-500">
+          <div className="relative mb-6">
+            {/* Soft pink blur background behind heart */}
+            <div className="absolute -inset-4 bg-pink-500/25 rounded-full blur-xl animate-pulse" />
+            
+            {/* Circular frame with slight bounce */}
+            <div className="relative w-24 h-24 bg-pink-500/10 border border-pink-500/30 rounded-full flex items-center justify-center shadow-inner animate-[bounce_2s_infinite]">
+              <svg 
+                className="w-12 h-12 text-pink-500 animate-[pulse_1.2s_infinite_ease-in-out]" 
+                fill="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"/>
+              </svg>
+            </div>
+          </div>
+          
+          <h2 className="text-2xl font-light tracking-[0.25em] uppercase text-pink-600 dark:text-pink-400 font-logo mb-2 animate-[pulse_1.5s_infinite]">
+            GUC Matchmaking
+          </h2>
+          
+          <p className="text-xs uppercase tracking-[0.15em] text-muted-foreground animate-pulse">
+            Connecting Hearts...
+          </p>
+        </div>
       </div>
     );
   }
@@ -93,6 +122,10 @@ function AppContent() {
   const navigationItems = [
     { value: 'dashboard', label: 'Match Control', icon: Activity },
     { value: 'clients', label: 'Profiles Directory', icon: Users },
+    { value: 'chat', label: 'Support Chat', icon: MessageCircle },
+    ...(isManagerOrAdmin ? [
+      { value: 'announcements', label: 'Broadcasts', icon: Sparkles }
+    ] : []),
     ...(currentUser.role !== 'admin' ? [
       { value: 'tasks', label: 'Match Progress', icon: CheckSquare }
     ] : []),
@@ -113,7 +146,7 @@ function AppContent() {
     <div className="min-h-screen bg-gradient-to-tr from-[oklch(0.98_0.01_250)] via-[oklch(0.96_0.01_220)] to-[oklch(0.97_0.02_280)] dark:from-[oklch(0.12_0.02_250)] dark:via-[oklch(0.08_0.01_220)] dark:to-[oklch(0.14_0.03_280)] text-foreground flex flex-col font-sans transition-colors duration-300">
       
       {/* Sleek collapsible glassmorphic header */}
-      <header className="border-b border-black/5 dark:border-white/5 bg-card/75 backdrop-blur-xl shadow-sm sticky top-0 z-40 transition-colors duration-300">
+      <header className="border-b border-black/5 dark:border-white/5 bg-card/75 backdrop-blur-xl shadow-sm sticky top-0 z-40 transition-colors duration-300 pt-[env(safe-area-inset-top,0px)]">
         <div className="container mx-auto px-4 h-16 flex items-center justify-between">
           <div className="flex items-center space-x-4 flex-1">
             <div className="flex items-center space-x-2">
@@ -370,6 +403,16 @@ function AppContent() {
             <Clients />
           </TabsContent>
 
+          <TabsContent value="chat" className="m-0 animate-in fade-in-50 duration-500">
+            <AdminChatHub />
+          </TabsContent>
+
+          {isManagerOrAdmin && (
+            <TabsContent value="announcements" className="m-0 animate-in fade-in-50 duration-500">
+              <AdminAnnouncements />
+            </TabsContent>
+          )}
+
           {currentUser.role !== 'admin' && (
             <TabsContent value="tasks" className="m-0 animate-in fade-in-50 duration-500">
               <Tasks />
@@ -396,7 +439,7 @@ function AppContent() {
       </main>
 
       {/* Gorgeous Glassmorphic Mobile Bottom Dock */}
-      <div className="md:hidden fixed bottom-6 left-4 right-4 z-40 max-w-md mx-auto">
+      <div className="md:hidden fixed bottom-[calc(1.5rem+env(safe-area-inset-bottom,0px))] left-4 right-4 z-40 max-w-md mx-auto">
         <div className="bg-card/80 dark:bg-zinc-900/80 backdrop-blur-xl border border-black/10 dark:border-white/10 shadow-2xl rounded-2xl p-2.5 flex justify-around items-center">
           {primaryItems.map(item => {
             const isActive = activeTab === item.value;
@@ -438,7 +481,7 @@ function AppContent() {
       {showMoreDrawer && (
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 md:hidden animate-in fade-in duration-200" onClick={() => setShowMoreDrawer(false)} />
       )}
-      <div className={`fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-2xl border-t border-black/10 dark:border-white/10 rounded-t-3xl p-6 shadow-2xl transition-transform duration-300 ease-in-out md:hidden ${showMoreDrawer ? 'translate-y-0' : 'translate-y-full'}`}>
+      <div className={`fixed bottom-0 left-0 right-0 z-50 bg-card/95 backdrop-blur-2xl border-t border-black/10 dark:border-white/10 rounded-t-3xl p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] shadow-2xl transition-transform duration-300 ease-in-out md:hidden ${showMoreDrawer ? 'translate-y-0' : 'translate-y-full'}`}>
         <div className="w-12 h-1 bg-muted-foreground/30 rounded-full mx-auto mb-4" />
         <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-4 text-center">More Pages</h3>
         <div className="space-y-2.5 max-h-[60vh] overflow-y-auto pr-1 no-scrollbar">

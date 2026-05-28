@@ -285,3 +285,31 @@ export interface BrandingSettings {
   dailyCheckinPin?: string;
 }
 
+export interface Favorite {
+  id: string;
+  userId: string; // The candidate who favorited another candidate
+  favoriteProfileId: string; // The candidate profile that was favorited
+  createdAt: string;
+}
+
+export interface ChatMessage {
+  id: string;
+  profileId: string; // Client profile ID (acts as the single chat thread index)
+  senderId: string; // Client profile ID or Admin user ID
+  senderName: string; // e.g. "Lady L101" or "Admin Sarah"
+  senderRole: 'client' | 'admin';
+  message: string;
+  createdAt: string;
+  senderEmail?: string;
+}
+
+export interface Announcement {
+  id: string;
+  title: string;
+  content: string;
+  createdBy: string; // Admin user ID
+  createdByName: string; // Admin name
+  createdAt: string;
+}
+
+

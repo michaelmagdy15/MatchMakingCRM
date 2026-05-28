@@ -1,5 +1,5 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
-import { auth, db } from './firebase';
+import { auth, db, isFirebaseConfigured } from './firebase';
 import { 
   collection, 
   doc, 
@@ -39,14 +39,18 @@ import {
   InteractionLog,
   CommissionRates,
   Match,
-  MatchStatus
+  MatchStatus,
+  Favorite,
+  ChatMessage,
+  Announcement
 } from './types';
 import { mockClients, mockMatches } from './data';
 
 interface AppContextType {
   currentUser: User | null;
   users: User[];
-  login: (email?: string, name?: string, role?: UserRole) => Promise<void>;
+  login: (email: string, password: string) => Promise<{ success: boolean; mustChange?: boolean; error?: string }>;
+  changePassword: (email: string, newPassword: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => Promise<void>;
   clients: Client[]; // masked profiles
   rawClients: Client[]; // raw profiles
@@ -126,6 +130,17 @@ interface AppContextType {
   updateCommissionRates: (rates: CommissionRates) => Promise<void>;
   isManagerOrAdmin: boolean;
   isStrictManager: boolean;
+  
+  // Custom Dating Portal Additions
+  favorites: Favorite[];
+  announcements: Announcement[];
+  messages: ChatMessage[];
+  addFavorite: (favoriteProfileId: string, userId: string) => Promise<void>;
+  removeFavorite: (favoriteProfileId: string, userId: string) => Promise<void>;
+  sendChatMessage: (profileId: string, senderId: string, senderName: string, senderRole: 'client' | 'admin', message: string) => Promise<void>;
+  addAnnouncement: (title: string, content: string) => Promise<void>;
+  deleteAnnouncement: (id: string) => Promise<void>;
+  isDataLoading: boolean;
 }
 
 const AppContext = createContext<AppContextType | undefined>(undefined);
@@ -144,11 +159,16 @@ const snakeToCamel = (obj: any): any => {
 };
 
 const camelToSnake = (obj: any): any => {
+  if (obj === undefined) return null;
+  if (obj === null) return null;
   if (Array.isArray(obj)) return obj.map(camelToSnake);
-  if (obj !== null && typeof obj === 'object') {
+  if (typeof obj === 'object') {
     return Object.keys(obj).reduce((acc: any, key) => {
-      const snake = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
-      acc[snake] = camelToSnake(obj[key]);
+      const val = obj[key];
+      if (val !== undefined) {
+        const snake = key.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`);
+        acc[snake] = camelToSnake(val);
+      }
       return acc;
     }, {});
   }
@@ -176,6 +196,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [searchQuery, setSearchQuery] = useState('');
   const [isAuthReady, setIsAuthReady] = useState(false);
   const [previewRole, setPreviewRole] = useState<UserRole | null>(null);
+  const [isDataLoading, setIsDataLoading] = useState(false);
 
   // Stubs for CRM-Specific States (keeps compiler happy and adapted for matchmaking)
   const [payments, setPayments] = useState<Payment[]>([]);
@@ -194,13 +215,18 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const setAttendances = setMatchMeetings;
   const [globalSalesTarget, setGlobalSalesTarget] = useState(50000);
   const [branding, setBranding] = useState<BrandingSettings>({
-    companyName: 'PureMatch CRM',
+    companyName: 'GUC Matchmaking',
     logoUrl: ''
   });
   const [commissionRates, setCommissionRates] = useState<CommissionRates>({
     ptRate: 8,
     groupRate: 5
   });
+
+  // Custom Dating Portal State Variables
+  const [favorites, setFavorites] = useState<Favorite[]>([]);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
 
   // Local Storage Sandbox Key definitions
   const STORAGE_KEYS = {
@@ -212,7 +238,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     BATCHES: 'dating_crm_batches',
     COMMENTS: 'dating_crm_comments',
     INTERACTIONS: 'dating_crm_interactions',
-    USERS: 'dating_crm_users'
+    USERS: 'dating_crm_users',
+    FAVORITES: 'dating_crm_favorites',
+    ANNOUNCEMENTS: 'dating_crm_announcements',
+    MESSAGES: 'dating_crm_messages'
   };
 
   // Helper to add audit log
@@ -239,9 +268,33 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // Load Initial Database State
   const fetchAllData = useCallback(async (userId: string) => {
+    setIsDataLoading(true);
     try {
-      // Fetch Users
-      const usersSnapshot = await getDocs(collection(db, 'match_users'));
+      // Execute concurrently using Promise.all
+      const [
+        usersSnapshot,
+        profilesSnapshot,
+        matchesSnapshot,
+        tasksSnapshot,
+        logsSnapshot,
+        commentsSnapshot,
+        interactionsSnapshot,
+        favoritesSnapshot,
+        announcementsSnapshot,
+        messagesSnapshot
+      ] = await Promise.all([
+        getDocs(collection(db, 'match_users')),
+        getDocs(collection(db, 'match_profiles')),
+        getDocs(collection(db, 'match_matches')),
+        getDocs(collection(db, 'match_tasks')),
+        getDocs(collection(db, 'match_audit_logs')),
+        getDocs(collection(db, 'match_comments')),
+        getDocs(collection(db, 'match_interactions')),
+        getDocs(collection(db, 'match_favorites')),
+        getDocs(collection(db, 'match_announcements')),
+        getDocs(collection(db, 'match_messages'))
+      ]);
+
       const firestoreUsers = usersSnapshot.docs.map(doc => {
         const data = doc.data();
         return {
@@ -251,8 +304,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       setUsers(firestoreUsers);
 
-      // Fetch Profiles
-      const profilesSnapshot = await getDocs(collection(db, 'match_profiles'));
       const firestoreProfiles = profilesSnapshot.docs.map(doc => {
         const data = doc.data();
         return {
@@ -262,8 +313,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       setBaseClients(firestoreProfiles);
 
-      // Fetch Matches
-      const matchesSnapshot = await getDocs(collection(db, 'match_matches'));
       const firestoreMatches = matchesSnapshot.docs.map(doc => {
         const data = doc.data();
         const camel = snakeToCamel(data);
@@ -276,8 +325,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       setBaseMatches(firestoreMatches);
 
-      // Fetch Tasks
-      const tasksSnapshot = await getDocs(collection(db, 'match_tasks'));
       const firestoreTasks = tasksSnapshot.docs.map(doc => {
         const data = doc.data();
         return {
@@ -287,8 +334,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       setTasks(firestoreTasks);
 
-      // Fetch Audit Logs
-      const logsSnapshot = await getDocs(collection(db, 'match_audit_logs'));
       const firestoreLogs = logsSnapshot.docs.map(doc => {
         const data = doc.data();
         return {
@@ -299,8 +344,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       firestoreLogs.sort((a, b) => b.timestamp.localeCompare(a.timestamp));
       setAuditLogs(firestoreLogs);
 
-      // Fetch Comments
-      const commentsSnapshot = await getDocs(collection(db, 'match_comments'));
       const commMap: Record<string, CRMComment[]> = {};
       commentsSnapshot.docs.forEach(doc => {
         const data = doc.data();
@@ -319,8 +362,6 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       setComments(commMap);
 
-      // Fetch Interactions
-      const interactionsSnapshot = await getDocs(collection(db, 'match_interactions'));
       const intMap: Record<string, InteractionLog[]> = {};
       interactionsSnapshot.docs.forEach(doc => {
         const data = doc.data();
@@ -341,6 +382,26 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         }
       });
       setInteractions(intMap);
+
+      const firestoreFavorites = favoritesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...snakeToCamel(doc.data())
+      })) as Favorite[];
+      setFavorites(firestoreFavorites);
+
+      const firestoreAnnouncements = announcementsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...snakeToCamel(doc.data())
+      })) as Announcement[];
+      firestoreAnnouncements.sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+      setAnnouncements(firestoreAnnouncements);
+
+      const firestoreMessages = messagesSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...snakeToCamel(doc.data())
+      })) as ChatMessage[];
+      firestoreMessages.sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+      setMessages(firestoreMessages);
 
     } catch (error) {
       console.error('Error fetching Firestore data:', error);
@@ -373,6 +434,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
       const loadedTargets = localStorage.getItem('dating_crm_targets');
       setUserTargets(loadedTargets ? JSON.parse(loadedTargets) : []);
+
+      const loadedFavorites = localStorage.getItem(STORAGE_KEYS.FAVORITES);
+      setFavorites(loadedFavorites ? JSON.parse(loadedFavorites) : []);
+
+      const loadedAnnouncements = localStorage.getItem(STORAGE_KEYS.ANNOUNCEMENTS);
+      setAnnouncements(loadedAnnouncements ? JSON.parse(loadedAnnouncements) : []);
+
+      const loadedMessages = localStorage.getItem(STORAGE_KEYS.MESSAGES);
+      setMessages(loadedMessages ? JSON.parse(loadedMessages) : []);
+    } finally {
+      setIsDataLoading(false);
     }
   }, []);
 
@@ -447,64 +519,239 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => unsubscribe();
   }, [fetchAllData]);
 
-  // Login handler
-  const login = async (email?: string, name?: string, role?: UserRole) => {
-    const targetEmail = email || 'sarah@datingcrm.com';
-    const targetName = name || 'Sarah';
-    const targetRole = role || 'crm_admin';
+  // SHA-256 password hashing helper
+  const hashPassword = useCallback(async (password: string): Promise<string> => {
+    const msgBuffer = new TextEncoder().encode(password);
+    const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
+    const hashArray = Array.from(new Uint8Array(hashBuffer));
+    return hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+  }, []);
 
-    let userObj: User = {
-      id: targetEmail.replace(/[^a-zA-Z0-9]/g, '-'),
-      name: targetName,
-      email: targetEmail,
-      role: targetRole
-    };
+  // Securely auto-seed our suggested admins Eman, Arwa and Michael
+  const autoSeedAdmins = useCallback(async () => {
+    try {
+      const defaultHash = await hashPassword('12345678');
+      const usersRef = collection(db, 'match_users');
+
+      // Seed Eman
+      const emanEmail = 'eman.matchhub@gmail.com';
+      const qEman = query(usersRef, where('email', '==', emanEmail));
+      const snapEman = await getDocs(qEman);
+      if (snapEman.empty) {
+        const docId = 'eman-matchhub-gmail-com';
+        await setDoc(doc(db, 'match_users', docId), {
+          id: docId,
+          name: 'Eman',
+          email: emanEmail,
+          role: 'crm_admin',
+          password_hash: defaultHash,
+          must_change_password: true,
+          created_at: new Date().toISOString()
+        });
+        console.log("Matchmaking CRM: Default matchmaker account Eman seeded successfully in Firestore.");
+      }
+
+      // Seed Arwa
+      const arwaEmail = 'arwa.matchhub@gmail.com';
+      const qArwa = query(usersRef, where('email', '==', arwaEmail));
+      const snapArwa = await getDocs(qArwa);
+      if (snapArwa.empty) {
+        const docId = 'arwa-matchhub-gmail-com';
+        await setDoc(doc(db, 'match_users', docId), {
+          id: docId,
+          name: 'Arwa',
+          email: arwaEmail,
+          role: 'crm_admin',
+          password_hash: defaultHash,
+          must_change_password: true,
+          created_at: new Date().toISOString()
+        });
+        console.log("Matchmaking CRM: Default matchmaker account Arwa seeded successfully in Firestore.");
+      }
+
+      // Seed Michael
+      const michaelEmail = 'michaelmitry13@gmail.com';
+      const qMichael = query(usersRef, where('email', '==', michaelEmail));
+      const snapMichael = await getDocs(qMichael);
+      if (snapMichael.empty) {
+        const docId = 'michaelmitry13-gmail-com';
+        await setDoc(doc(db, 'match_users', docId), {
+          id: docId,
+          name: 'Michael Mitry',
+          email: michaelEmail,
+          role: 'crm_admin',
+          password_hash: defaultHash,
+          must_change_password: true,
+          created_at: new Date().toISOString()
+        });
+        console.log("Matchmaking CRM: Default matchmaker account Michael Mitry seeded successfully in Firestore.");
+      }
+    } catch (e) {
+      console.error("Matchmaking CRM: Auto-seeding matchmaker admins failed:", e);
+    }
+  }, [hashPassword]);
+
+  useEffect(() => {
+    if (isFirebaseConfigured) {
+      autoSeedAdmins();
+    }
+  }, [autoSeedAdmins]);
+
+  // Login handler with password validation
+  const login = async (email: string, password: string) => {
+    const targetEmail = email.trim().toLowerCase();
+    const hashed = await hashPassword(password);
 
     try {
-      // Query by email in Firestore match_users collection
       const usersRef = collection(db, 'match_users');
       const q = query(usersRef, where('email', '==', targetEmail));
       const querySnapshot = await getDocs(q);
-      
-      if (!querySnapshot.empty) {
-        const matchedDoc = querySnapshot.docs[0];
-        const data = matchedDoc.data();
-        userObj = {
-          id: matchedDoc.id,
-          name: data.name || targetName,
-          email: targetEmail,
-          role: data.role || targetRole
-        };
-      } else {
-        const docId = (auth.currentUser && auth.currentUser.email === targetEmail) 
-          ? auth.currentUser.uid 
-          : targetEmail.replace(/[^a-zA-Z0-9]/g, '-');
-        
-        userObj = {
-          id: docId,
-          name: targetName,
-          email: targetEmail,
-          role: targetRole
-        };
-        
-        const userDocRef = doc(db, 'match_users', docId);
-        await setDoc(userDocRef, camelToSnake(userObj));
+
+      if (querySnapshot.empty) {
+        throw new Error("Account not found in our database. Please check your credentials.");
       }
-    } catch (error) {
-      console.error("Firestore login update failed:", error);
-      // Local Storage users save
+
+      const matchedDoc = querySnapshot.docs[0];
+      const data = matchedDoc.data();
+
+      // Check password hash
+      if (data.password_hash !== hashed) {
+        throw new Error("Incorrect password. Please try again.");
+      }
+
+      // Check if they must reset their password
+      if (data.must_change_password === true || data.must_change_password === 'true') {
+        return { success: true, mustChange: true, userId: matchedDoc.id };
+      }
+
+      const userObj: User = {
+        id: matchedDoc.id,
+        name: data.name || (targetEmail.includes('eman') ? 'Eman' : targetEmail.includes('michael') ? 'Michael Mitry' : 'Arwa'),
+        email: targetEmail,
+        role: data.role || 'crm_admin'
+      };
+
+      setCurrentUser(userObj);
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userObj));
+      await fetchAllData(userObj.id);
+
+      return { success: true, mustChange: false };
+    } catch (error: any) {
+      console.error("Authentication check failed:", error);
+      
+      // Sandbox fallback logic for offline operations
       const localUsers = localStorage.getItem(STORAGE_KEYS.USERS);
       const currentUsersList: User[] = localUsers ? JSON.parse(localUsers) : MOCK_USERS;
-      if (!currentUsersList.find(u => u.email === targetEmail)) {
-        const updatedUsersList = [...currentUsersList, userObj];
-        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(updatedUsersList));
-        setUsers(updatedUsersList);
+      const matchedLocal = currentUsersList.find(u => u.email.toLowerCase() === targetEmail);
+
+      if (!matchedLocal) {
+        // Support offline dynamic testing for Eman/Arwa/Michael
+        if (targetEmail === 'eman.matchhub@gmail.com' || targetEmail === 'arwa.matchhub@gmail.com' || targetEmail === 'michaelmitry13@gmail.com') {
+          const defaultHash = await hashPassword('12345678');
+          if (hashed === defaultHash) {
+            return { success: true, mustChange: true, userId: targetEmail.replace(/[^a-zA-Z0-9]/g, '-') };
+          }
+        }
+        throw new Error(error.message || "Authentication failed.");
+      }
+
+      const localPasswordHash = (matchedLocal as any).passwordHash || await hashPassword('12345678');
+      if (hashed !== localPasswordHash) {
+        throw new Error("Incorrect password.");
+      }
+
+      if ((matchedLocal as any).mustChangePassword === true) {
+        return { success: true, mustChange: true, userId: matchedLocal.id };
+      }
+
+      setCurrentUser(matchedLocal);
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(matchedLocal));
+      await fetchAllData(matchedLocal.id);
+
+      return { success: true, mustChange: false };
+    }
+  };
+
+  // Change password handler
+  const changePassword = async (email: string, newPassword: string) => {
+    const targetEmail = email.trim().toLowerCase();
+    const newHash = await hashPassword(newPassword);
+
+    try {
+      const usersRef = collection(db, 'match_users');
+      const q = query(usersRef, where('email', '==', targetEmail));
+      const querySnapshot = await getDocs(q);
+
+      if (querySnapshot.empty) {
+        throw new Error("User account not found in database.");
+      }
+
+      const matchedDoc = querySnapshot.docs[0];
+      const docRef = doc(db, 'match_users', matchedDoc.id);
+
+      await updateDoc(docRef, {
+        password_hash: newHash,
+        must_change_password: false
+      });
+
+      const data = matchedDoc.data();
+      const userObj: User = {
+        id: matchedDoc.id,
+        name: data.name || (targetEmail.includes('eman') ? 'Eman' : targetEmail.includes('michael') ? 'Michael Mitry' : 'Arwa'),
+        email: targetEmail,
+        role: data.role || 'crm_admin'
+      };
+
+      setCurrentUser(userObj);
+      localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userObj));
+      await fetchAllData(userObj.id);
+
+      return { success: true };
+    } catch (error: any) {
+      console.error("Failed to update password:", error);
+      
+      const localUsers = localStorage.getItem(STORAGE_KEYS.USERS);
+      const currentUsersList: User[] = localUsers ? JSON.parse(localUsers) : MOCK_USERS;
+      const matchedIndex = currentUsersList.findIndex(u => u.email.toLowerCase() === targetEmail);
+
+      if (matchedIndex !== -1) {
+        const updatedUser = {
+          ...currentUsersList[matchedIndex],
+          passwordHash: newHash,
+          mustChangePassword: false
+        };
+        const updatedList = [...currentUsersList];
+        updatedList[matchedIndex] = updatedUser as any;
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(updatedList));
+        setUsers(updatedList);
+
+        setCurrentUser(updatedUser);
+        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(updatedUser));
+        await fetchAllData(updatedUser.id);
+        return { success: true };
+      } else {
+        const targetName = targetEmail.includes('eman') ? 'Eman' : targetEmail.includes('michael') ? 'Michael Mitry' : 'Arwa';
+        const userObj: User = {
+          id: targetEmail.replace(/[^a-zA-Z0-9]/g, '-'),
+          name: targetName,
+          email: targetEmail,
+          role: 'crm_admin'
+        };
+        const updatedUser = {
+          ...userObj,
+          passwordHash: newHash,
+          mustChangePassword: false
+        };
+        const updatedList = [...currentUsersList, updatedUser];
+        localStorage.setItem(STORAGE_KEYS.USERS, JSON.stringify(updatedList));
+        setUsers(updatedList as any);
+
+        setCurrentUser(updatedUser as any);
+        localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(updatedUser));
+        await fetchAllData(updatedUser.id);
+        return { success: true };
       }
     }
-
-    setCurrentUser(userObj);
-    localStorage.setItem(STORAGE_KEYS.USER, JSON.stringify(userObj));
-    await fetchAllData(userObj.id);
   };
 
   // Logout handler
@@ -555,6 +802,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     return {
       ...profile,
+      // Scrub identity details until unlocked
+      name: contactsUnlocked ? profile.name : '[Locked]',
+      fullName: contactsUnlocked ? profile.fullName : '[Locked]',
+      email: contactsUnlocked ? profile.email : '[Locked]',
+      gucId: contactsUnlocked ? profile.gucId : '[Locked]',
+      
       // If photo is locked, block details
       recentPhoto: photosUnlocked ? profile.recentPhoto : (profile.recentPhoto ? '' : undefined),
       phone: contactsUnlocked ? profile.phone : '[Locked - Awaiting Mutual Approvals]',
@@ -737,6 +990,17 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
   // CRUD Operations: MATCHES
   const addMatch = async (match: Omit<Match, 'id' | 'createdAt' | 'updatedAt'>) => {
+    // Enforce 1-active-match validation constraint
+    const activeMaleMatch = baseMatches.find(m => m.maleId === match.maleId && m.status !== 'UNMATCHED');
+    const activeFemaleMatch = baseMatches.find(m => m.femaleId === match.femaleId && m.status !== 'UNMATCHED');
+    
+    if (activeMaleMatch) {
+      throw new Error(`Gentleman candidate is already in an active match process (Match ID: ${activeMaleMatch.id}).`);
+    }
+    if (activeFemaleMatch) {
+      throw new Error(`Lady candidate is already in an active match process (Match ID: ${activeFemaleMatch.id}).`);
+    }
+
     const newId = Math.random().toString(36).substr(2, 9);
     let newMatch: Match = {
       ...match,
@@ -863,7 +1127,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       // 4. Trigger 1-Month Follow-up when 1-Week check is completed
-      if (updates.firstCheck && oldMatch.firstCheck === 'Pending' && updates.firstCheck !== 'Pending') {
+      if (updates.firstCheck && (!oldMatch.firstCheck || oldMatch.firstCheck === 'Pending') && updates.firstCheck !== 'Pending') {
         const dueDate = new Date();
         dueDate.setDate(dueDate.getDate() + 30);
         await addTask({
@@ -878,7 +1142,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       }
 
       // 5. Trigger 3-Month Follow-up when 1-Month check is completed
-      if (updates.secondCheck && oldMatch.secondCheck === 'Pending' && updates.secondCheck !== 'Pending') {
+      if (updates.secondCheck && (!oldMatch.secondCheck || oldMatch.secondCheck === 'Pending') && updates.secondCheck !== 'Pending') {
         const dueDate = new Date();
         dueDate.setDate(dueDate.getDate() + 90);
         await addTask({
@@ -905,6 +1169,109 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
 
     setBaseMatches(prev => prev.filter(m => m.id !== id));
     await addAuditLog('DELETE', 'PACKAGE_RECORD', id, `Deleted match transaction: ${id}`);
+  };
+
+  // CRUD Operations: FAVORITES
+  const addFavorite = async (favoriteProfileId: string, userId: string) => {
+    const newId = Math.random().toString(36).substr(2, 9);
+    const newFavorite: Favorite = {
+      id: newId,
+      userId,
+      favoriteProfileId,
+      createdAt: new Date().toISOString()
+    };
+
+    try {
+      await setDoc(doc(db, 'match_favorites', newId), camelToSnake(newFavorite));
+    } catch (error) {
+      console.error("Error adding favorite to Firestore:", error);
+      const currentList = [...favorites, newFavorite];
+      localStorage.setItem(STORAGE_KEYS.FAVORITES, JSON.stringify(currentList));
+    }
+
+    setFavorites(prev => [...prev, newFavorite]);
+  };
+
+  const removeFavorite = async (favoriteProfileId: string, userId: string) => {
+    const favToRemove = favorites.find(f => f.userId === userId && f.favoriteProfileId === favoriteProfileId);
+    if (!favToRemove) return;
+
+    try {
+      await deleteDoc(doc(db, 'match_favorites', favToRemove.id));
+    } catch (error) {
+      console.error("Error removing favorite from Firestore:", error);
+      const currentList = favorites.filter(f => f.id !== favToRemove.id);
+      localStorage.setItem(STORAGE_KEYS.FAVORITES, JSON.stringify(currentList));
+    }
+
+    setFavorites(prev => prev.filter(f => f.id !== favToRemove.id));
+  };
+
+  // CRUD Operations: CHAT MESSAGES
+  const sendChatMessage = async (
+    profileId: string, 
+    senderId: string, 
+    senderName: string, 
+    senderRole: 'client' | 'admin', 
+    message: string,
+    senderEmail?: string
+  ) => {
+    const newId = Math.random().toString(36).substr(2, 9);
+    const newMessage: ChatMessage = {
+      id: newId,
+      profileId,
+      senderId,
+      senderName,
+      senderRole,
+      message,
+      createdAt: new Date().toISOString(),
+      senderEmail: senderEmail || (senderRole === 'admin' ? currentUser?.email : '')
+    };
+
+    try {
+      await setDoc(doc(db, 'match_messages', newId), camelToSnake(newMessage));
+    } catch (error) {
+      console.error("Error sending message to Firestore:", error);
+      const currentList = [...messages, newMessage];
+      localStorage.setItem(STORAGE_KEYS.MESSAGES, JSON.stringify(currentList));
+    }
+
+    setMessages(prev => [...prev, newMessage]);
+  };
+
+  // CRUD Operations: ANNOUNCEMENTS
+  const addAnnouncement = async (title: string, content: string) => {
+    const newId = Math.random().toString(36).substr(2, 9);
+    const newAnn: Announcement = {
+      id: newId,
+      title,
+      content,
+      createdBy: currentUser?.id || 'admin-sarah',
+      createdByName: currentUser?.name || 'Sarah',
+      createdAt: new Date().toISOString()
+    };
+
+    try {
+      await setDoc(doc(db, 'match_announcements', newId), camelToSnake(newAnn));
+    } catch (error) {
+      console.error("Error adding announcement to Firestore:", error);
+      const currentList = [newAnn, ...announcements];
+      localStorage.setItem(STORAGE_KEYS.ANNOUNCEMENTS, JSON.stringify(currentList));
+    }
+
+    setAnnouncements(prev => [newAnn, ...prev]);
+  };
+
+  const deleteAnnouncement = async (id: string) => {
+    try {
+      await deleteDoc(doc(db, 'match_announcements', id));
+    } catch (error) {
+      console.error("Error deleting announcement from Firestore:", error);
+      const currentList = announcements.filter(a => a.id !== id);
+      localStorage.setItem(STORAGE_KEYS.ANNOUNCEMENTS, JSON.stringify(currentList));
+    }
+
+    setAnnouncements(prev => prev.filter(a => a.id !== id));
   };
 
   // CRUD Operations: COMMENTS & INTERACTIONS
@@ -1245,6 +1612,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     currentUser,
     users,
     login,
+    changePassword,
     logout,
     clients,
     rawClients,
@@ -1323,7 +1691,19 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     commissionRates,
     updateCommissionRates,
     isManagerOrAdmin,
-    isStrictManager
+    isStrictManager,
+    
+    isDataLoading,
+
+    // Custom Dating Portal Additions
+    favorites,
+    announcements,
+    messages,
+    addFavorite,
+    removeFavorite,
+    sendChatMessage,
+    addAnnouncement,
+    deleteAnnouncement
   }), [
     currentUser,
     users,
@@ -1355,7 +1735,16 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     canAssignLeads,
     commissionRates,
     isManagerOrAdmin,
-    isStrictManager
+    isStrictManager,
+    isDataLoading,
+    favorites,
+    announcements,
+    messages,
+    addFavorite,
+    removeFavorite,
+    sendChatMessage,
+    addAnnouncement,
+    deleteAnnouncement
   ]);
 
   return (

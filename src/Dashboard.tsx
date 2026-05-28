@@ -76,6 +76,8 @@ export default function Dashboard() {
   const [isProposalOpen, setIsProposalOpen] = useState(false);
   const [selectedGentlemanId, setSelectedGentlemanId] = useState('');
   const [selectedLadyId, setSelectedLadyId] = useState('');
+  const [gentSearch, setGentSearch] = useState('');
+  const [ladySearch, setLadySearch] = useState('');
   const [proposalNotes, setProposalNotes] = useState('');
   const [activeColIndex, setActiveColIndex] = useState(0);
 
@@ -442,7 +444,7 @@ export default function Dashboard() {
     };
 
     return (
-      <div key={col.status} className={`rounded-2xl p-4 border ${col.bg} ${col.border} flex flex-col space-y-4 ${isMobile ? 'min-h-[400px]' : 'min-h-[500px]'}`}>
+      <div key={col.status} className={`rounded-2xl p-4 border ${col.bg} ${col.border} flex flex-col space-y-4 btn-tactile-rebound ${isMobile ? 'min-h-[400px]' : 'min-h-[500px]'}`}>
         {/* Column Title Header */}
         <div className="space-y-1">
           <div className="flex items-center justify-between">
@@ -451,31 +453,31 @@ export default function Dashboard() {
               {colMatches.length}
             </Badge>
           </div>
-          <p className="text-[10px] text-zinc-400">{col.desc}</p>
+          <p className="text-xs text-zinc-400">{col.desc}</p>
         </div>
 
         {/* Match Cards List */}
         <div className="flex-1 overflow-y-auto space-y-3 pr-1 max-h-[600px] no-scrollbar">
           {colMatches.length === 0 ? (
-            <div className="h-full flex flex-col items-center justify-center border border-dashed border-white/5 rounded-xl p-6 text-center text-zinc-600">
+            <div className="h-full flex flex-col items-center justify-center border border-dashed border-border rounded-xl p-6 text-center text-zinc-400">
               <HelpCircle className="h-6 w-6 mb-1 opacity-50" />
               <span className="text-xs">No active pairs</span>
             </div>
           ) : (
             colMatches.map(match => {
               return (
-                <Card key={match.id} className="bg-zinc-950 border-white/5 shadow-md rounded-xl p-3 space-y-3 hover:scale-[1.01] hover:border-zinc-800 hover:shadow-lg active:scale-[0.99] transition-all duration-300 relative overflow-hidden group cursor-pointer">
+                <Card key={match.id} className="bg-card border-border shadow-md rounded-xl p-3 space-y-3 hover:scale-[1.01] hover:border-zinc-800 hover:shadow-lg active:scale-[0.99] transition-all duration-300 relative overflow-hidden group cursor-pointer">
                   {/* Top row codes & unmatch button */}
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-1.5">
-                      <Badge className="bg-indigo-950 text-indigo-400 font-bold border-indigo-500/10 text-[10px]">{match.gentlemanCode}</Badge>
+                      <Badge className="bg-indigo-950 text-indigo-400 font-bold border-indigo-500/10 text-xs">{match.gentlemanCode}</Badge>
                       <Heart className="h-3 w-3 text-pink-500 fill-pink-500" />
-                      <Badge className="bg-pink-950 text-pink-400 font-bold border-pink-500/10 text-[10px]">{match.ladyCode}</Badge>
+                      <Badge className="bg-pink-950 text-pink-400 font-bold border-pink-500/10 text-xs">{match.ladyCode}</Badge>
                     </div>
                     <Button 
                       variant="ghost" 
                       size="icon" 
-                      className="h-6 w-6 text-zinc-600 hover:text-rose-400 hover:bg-zinc-900 rounded-md"
+                      className="h-6 w-6 text-zinc-400 hover:text-rose-450 hover:bg-muted rounded-md btn-tactile-rebound"
                       onClick={() => triggerUnmatch(match.id)}
                     >
                       <X className="h-3 w-3" />
@@ -495,14 +497,14 @@ export default function Dashboard() {
                   </div>
 
                   {/* Phase Actions State Machine */}
-                  <div className="bg-zinc-900/50 p-2 rounded-lg border border-white/5 space-y-2">
+                  <div className="bg-muted/50 p-2 rounded-lg border border-border space-y-2">
                     {match.status === MatchStatus.PENDING_PROFILE_APPROVAL && (
                       <div className="space-y-2">
-                        <div className="flex justify-between items-center text-[9px] uppercase tracking-wider text-zinc-550 font-bold border-b border-white/5 pb-1">
+                        <div className="flex justify-between items-center text-xs uppercase tracking-wider text-zinc-555 font-bold border-b border-border pb-1">
                           <span>1. Portal Text Reviews</span>
-                          <span className="text-[8px] text-zinc-600">Phase 1</span>
+                          <span className="text-[8px] text-zinc-450">Phase 1</span>
                         </div>
-                        <div className="space-y-1 text-[10px] text-zinc-400">
+                        <div className="space-y-1 text-xs text-zinc-400">
                           <div className="flex justify-between items-center">
                             <span>Gentleman ({match.gentlemanCode}):</span>
                             <span className={match.maleProfileApproved ? "text-emerald-450 font-bold" : "text-amber-500 font-medium"}>
@@ -520,7 +522,7 @@ export default function Dashboard() {
                           <Button 
                             size="sm" 
                             variant={match.maleProfileApproved ? 'default' : 'outline'}
-                            className={`h-6 text-[9px] px-1 transition-all ${match.maleProfileApproved ? 'bg-indigo-950 text-indigo-400 border border-indigo-500/20 font-bold' : 'border-white/5 text-zinc-550 hover:bg-zinc-900 hover:text-zinc-300'}`}
+                            className={`h-6 text-xs px-1 transition-all btn-tactile-rebound ${match.maleProfileApproved ? 'bg-indigo-950 text-indigo-400 border border-indigo-500/20 font-bold' : 'border-border text-zinc-455 hover:bg-muted hover:text-zinc-300'}`}
                             onClick={() => toggleMaleProfileApprove(match)}
                             title="Admin Override Gentleman Text Approval"
                           >
@@ -529,7 +531,7 @@ export default function Dashboard() {
                           <Button 
                             size="sm" 
                             variant={match.femaleProfileApproved ? 'default' : 'outline'}
-                            className={`h-6 text-[9px] px-1 transition-all ${match.femaleProfileApproved ? 'bg-pink-950 text-pink-400 border border-pink-500/20 font-bold' : 'border-white/5 text-zinc-550 hover:bg-zinc-900 hover:text-zinc-300'}`}
+                            className={`h-6 text-xs px-1 transition-all btn-tactile-rebound ${match.femaleProfileApproved ? 'bg-pink-950 text-pink-400 border border-pink-500/20 font-bold' : 'border-border text-zinc-455 hover:bg-muted hover:text-zinc-300'}`}
                             onClick={() => toggleFemaleProfileApprove(match)}
                             title="Admin Override Lady Text Approval"
                           >
@@ -541,11 +543,11 @@ export default function Dashboard() {
 
                     {match.status === MatchStatus.PENDING_PHOTO_APPROVAL && (
                       <div className="space-y-2">
-                        <div className="flex justify-between items-center text-[9px] uppercase tracking-wider text-zinc-555 font-bold border-b border-white/5 pb-1">
+                        <div className="flex justify-between items-center text-xs uppercase tracking-wider text-zinc-555 font-bold border-b border-border pb-1">
                           <span>2. Portal Photo Swaps</span>
-                          <span className="text-[8px] text-zinc-600">Phase 2</span>
+                          <span className="text-[8px] text-zinc-450">Phase 2</span>
                         </div>
-                        <div className="space-y-1 text-[10px] text-zinc-400">
+                        <div className="space-y-1 text-xs text-zinc-400">
                           <div className="flex justify-between items-center">
                             <span>Gentleman ({match.gentlemanCode}):</span>
                             <span className={match.malePhotoApproved ? "text-emerald-450 font-bold" : "text-amber-500 font-medium"}>
@@ -563,7 +565,7 @@ export default function Dashboard() {
                           <Button 
                             size="sm" 
                             variant={match.malePhotoApproved ? 'default' : 'outline'}
-                            className={`h-6 text-[9px] px-1 transition-all ${match.malePhotoApproved ? 'bg-indigo-950 text-indigo-400 border border-indigo-500/20 font-bold' : 'border-white/5 text-zinc-550 hover:bg-zinc-900 hover:text-zinc-300'}`}
+                            className={`h-6 text-xs px-1 transition-all btn-tactile-rebound ${match.malePhotoApproved ? 'bg-indigo-950 text-indigo-400 border border-indigo-500/20 font-bold' : 'border-border text-zinc-455 hover:bg-muted hover:text-zinc-300'}`}
                             onClick={() => toggleMalePhotoApprove(match)}
                             title="Admin Override Gentleman Photo Swap Approval"
                           >
@@ -572,7 +574,7 @@ export default function Dashboard() {
                           <Button 
                             size="sm" 
                             variant={match.femalePhotoApproved ? 'default' : 'outline'}
-                            className={`h-6 text-[9px] px-1 transition-all ${match.femalePhotoApproved ? 'bg-pink-950 text-pink-400 border border-pink-500/20 font-bold' : 'border-white/5 text-zinc-550 hover:bg-zinc-900 hover:text-zinc-300'}`}
+                            className={`h-6 text-xs px-1 transition-all btn-tactile-rebound ${match.femalePhotoApproved ? 'bg-pink-950 text-pink-400 border border-pink-500/20 font-bold' : 'border-border text-zinc-455 hover:bg-muted hover:text-zinc-300'}`}
                             onClick={() => toggleFemalePhotoApprove(match)}
                             title="Admin Override Lady Photo Swap Approval"
                           >
@@ -584,11 +586,11 @@ export default function Dashboard() {
 
                     {match.status === MatchStatus.PENDING_CONTACT_SHARE && (
                       <div className="space-y-2">
-                        <div className="flex justify-between items-center text-[9px] uppercase tracking-wider text-zinc-555 font-bold border-b border-white/5 pb-1">
+                        <div className="flex justify-between items-center text-xs uppercase tracking-wider text-zinc-555 font-bold border-b border-border pb-1">
                           <span>3. Portal Contact Releases</span>
-                          <span className="text-[8px] text-zinc-600">Phase 3</span>
+                          <span className="text-[8px] text-zinc-450">Phase 3</span>
                         </div>
-                        <div className="space-y-1 text-[10px] text-zinc-400">
+                        <div className="space-y-1 text-xs text-zinc-400">
                           <div className="flex justify-between items-center">
                             <span>Gentleman ({match.gentlemanCode}):</span>
                             <span className={match.maleContactApproved ? "text-emerald-450 font-bold" : "text-amber-500 font-medium"}>
@@ -606,7 +608,7 @@ export default function Dashboard() {
                           <Button 
                             size="sm" 
                             variant={match.maleContactApproved ? 'default' : 'outline'}
-                            className={`h-6 text-[9px] px-1 transition-all ${match.maleContactApproved ? 'bg-indigo-950 text-indigo-400 border border-indigo-500/20 font-bold' : 'border-white/5 text-zinc-555 hover:bg-zinc-900 hover:text-zinc-300'}`}
+                            className={`h-6 text-xs px-1 transition-all btn-tactile-rebound ${match.maleContactApproved ? 'bg-indigo-950 text-indigo-400 border border-indigo-500/20 font-bold' : 'border-border text-zinc-455 hover:bg-muted hover:text-zinc-300'}`}
                             onClick={() => toggleMaleContactApprove(match)}
                             title="Admin Override Gentleman Contact release"
                           >
@@ -615,7 +617,7 @@ export default function Dashboard() {
                           <Button 
                             size="sm" 
                             variant={match.femaleContactApproved ? 'default' : 'outline'}
-                            className={`h-6 text-[9px] px-1 transition-all ${match.femaleContactApproved ? 'bg-pink-950 text-pink-400 border border-pink-500/20 font-bold' : 'border-white/5 text-zinc-555 hover:bg-zinc-900 hover:text-zinc-300'}`}
+                            className={`h-6 text-xs px-1 transition-all btn-tactile-rebound ${match.femaleContactApproved ? 'bg-pink-950 text-pink-400 border border-pink-500/20 font-bold' : 'border-border text-zinc-455 hover:bg-muted hover:text-zinc-300'}`}
                             onClick={() => toggleFemaleContactApprove(match)}
                             title="Admin Override Lady Contact release"
                           >
@@ -628,17 +630,17 @@ export default function Dashboard() {
                     {match.status === MatchStatus.MATCH_ACTIVE && (
                       <div className="space-y-1.5">
                         <div className="flex justify-between items-center">
-                          <span className="text-[9px] uppercase tracking-wider text-zinc-500 font-bold">Match Progress Tracker</span>
+                          <span className="text-xs uppercase tracking-wider text-zinc-455 font-bold">Match Progress Tracker</span>
                           <Badge className="bg-emerald-500/10 text-emerald-400 text-[8px] border-emerald-500/10">Active Match</Badge>
                         </div>
                         <div className="space-y-1.5 pt-1">
-                          <div className="flex justify-between items-center text-[10px] pb-1.5 border-b border-white/5">
+                          <div className="flex justify-between items-center text-xs pb-1.5 border-b border-border">
                             <span className="text-zinc-400 flex items-center gap-1"><CalendarDays className="h-3 w-3 text-zinc-500" /> 1-Week Check:</span>
                             <Select 
                               value={match.firstCheck || 'Pending'} 
                               onValueChange={(val) => updateMatchProgress(match, 'firstCheck', val)}
                             >
-                              <SelectTrigger className="h-6 w-[80px] text-[10px] bg-zinc-900 border-zinc-800 text-white p-1">
+                              <SelectTrigger className="h-6 w-[80px] text-xs bg-zinc-900 border-zinc-800 text-white p-1">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent className="bg-zinc-900 border-zinc-800 text-white">
@@ -652,7 +654,7 @@ export default function Dashboard() {
                           <Button 
                             size="sm"
                             variant="outline"
-                            className="w-full h-7 text-[9px] bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-pink-400 hover:text-pink-300 font-bold tracking-wider uppercase mt-1 rounded-lg flex items-center justify-center gap-1 cursor-pointer"
+                            className="w-full h-7 text-xs bg-zinc-900 border-zinc-800 hover:bg-zinc-800 text-pink-400 hover:text-pink-300 font-bold tracking-wider uppercase mt-1 rounded-lg flex items-center justify-center gap-1 cursor-pointer btn-tactile-rebound"
                             onClick={() => triggerScheduleDate(match)}
                           >
                             <CalendarDays className="h-3.5 w-3.5 text-pink-400" /> Schedule Date
@@ -663,19 +665,19 @@ export default function Dashboard() {
 
                     {match.status === MatchStatus.PENDING_FEEDBACK && (
                       <div className="space-y-1.5">
-                        <span className="text-[9px] uppercase tracking-wider text-zinc-500 font-bold">Feedback Checks</span>
-                        <div className="space-y-1 text-[10px]">
-                          <div className="flex justify-between items-center py-0.5 border-b border-white/5">
-                            <span className="text-zinc-500">1-Week:</span>
-                            <span className={`font-semibold ${match.firstCheck === 'Broken' ? 'text-rose-400' : 'text-emerald-400'}`}>{match.firstCheck || 'Pending'}</span>
+                        <span className="text-xs uppercase tracking-wider text-zinc-455 font-bold">Feedback Checks</span>
+                        <div className="space-y-1 text-xs">
+                          <div className="flex justify-between items-center py-0.5 border-b border-border">
+                            <span className="text-zinc-450">1-Week:</span>
+                            <span className={`font-semibold ${match.firstCheck === 'Broken' ? 'text-rose-450' : 'text-emerald-450'}`}>{match.firstCheck || 'Pending'}</span>
                           </div>
-                          <div className="flex justify-between items-center py-0.5 border-b border-white/5">
+                          <div className="flex justify-between items-center py-0.5 border-b border-border">
                             <span className="text-zinc-400">1-Month:</span>
                             <Select 
                               value={match.secondCheck || 'Pending'} 
                               onValueChange={(val) => updateMatchProgress(match, 'secondCheck', val)}
                             >
-                              <SelectTrigger className="h-5 w-[70px] text-[10px] bg-zinc-900 border-zinc-800 text-white p-1">
+                              <SelectTrigger className="h-5 w-[70px] text-xs bg-zinc-900 border-zinc-800 text-white p-1">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent className="bg-zinc-900 border-zinc-800 text-white">
@@ -692,7 +694,7 @@ export default function Dashboard() {
                               value={match.thirdCheck || 'Pending'} 
                               onValueChange={(val) => updateMatchProgress(match, 'thirdCheck', val)}
                             >
-                              <SelectTrigger className="h-5 w-[70px] text-[10px] bg-zinc-900 border-zinc-800 text-white p-1">
+                              <SelectTrigger className="h-5 w-[70px] text-xs bg-zinc-900 border-zinc-800 text-white p-1">
                                 <SelectValue />
                               </SelectTrigger>
                               <SelectContent className="bg-zinc-900 border-zinc-800 text-white">
@@ -710,15 +712,15 @@ export default function Dashboard() {
 
                   {/* Contact Details / Reveal section */}
                   {['PENDING_CONTACT_SHARE', 'MATCH_ACTIVE', 'PENDING_FEEDBACK'].includes(match.status) && (
-                    <div className="bg-zinc-900/30 p-2 rounded-lg border border-white/5 space-y-1.5 text-[11px]">
-                      <div className="flex justify-between items-center text-[10px] text-zinc-500 font-bold uppercase tracking-wider">
+                    <div className="bg-muted/30 p-2 rounded-lg border border-border space-y-1.5 text-xs">
+                      <div className="flex justify-between items-center text-xs text-zinc-500 font-bold uppercase tracking-wider">
                         <span>Contact Details</span>
                         {!revealedMatches[match.id] ? (
                           <Button 
                             variant="ghost" 
                             size="sm" 
                             onClick={() => handleRevealMatchContacts(match)} 
-                            className="h-5 px-1.5 text-[9px] font-black border border-amber-500/25 text-amber-500 hover:bg-amber-500/10 rounded-md"
+                            className="h-5 px-1.5 text-xs font-black border border-amber-500/25 text-amber-500 hover:bg-amber-500/10 rounded-md btn-tactile-rebound"
                           >
                             Reveal
                           </Button>
@@ -750,14 +752,14 @@ export default function Dashboard() {
 
                   {/* Notes */}
                   {match.notes && (
-                    <p className="text-[10px] text-zinc-500 bg-zinc-900/30 p-1.5 rounded border border-white/5 italic line-clamp-2" title={match.notes}>
+                    <p className="text-xs text-zinc-500 bg-muted/30 p-1.5 rounded border border-border italic line-clamp-2" title={match.notes}>
                       "{match.notes}"
                     </p>
                   )}
 
                   {/* Footer Admin info */}
-                  <div className="flex items-center justify-between text-[10px] text-zinc-600 pt-1 border-t border-white/5">
-                    <span className="flex items-center gap-1"><User className="h-3 w-3 text-zinc-700" /> {match.responsibleAdminName || 'Matchmaker'}</span>
+                  <div className="flex items-center justify-between text-xs text-zinc-400 pt-1 border-t border-border">
+                    <span className="flex items-center gap-1"><User className="h-3 w-3 text-zinc-555" /> {match.responsibleAdminName || 'Matchmaker'}</span>
                     <span>{new Date(match.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}</span>
                   </div>
                 </Card>
@@ -791,7 +793,7 @@ export default function Dashboard() {
         {/* Propose Button */}
         <Dialog open={isProposalOpen} onOpenChange={setIsProposalOpen}>
           <DialogTrigger asChild>
-            <Button className="w-full md:w-auto bg-gradient-to-r from-pink-500 to-purple-600 text-white border-0 shadow-lg shadow-pink-500/25 hover:from-pink-600 hover:to-purple-700 transition-all font-semibold">
+            <Button className="w-full md:w-auto bg-gradient-to-r from-pink-500 to-purple-600 text-white border-0 shadow-lg shadow-pink-500/25 hover:from-pink-600 hover:to-purple-700 transition-all font-semibold btn-tactile-rebound">
               <Plus className="h-4 w-4 mr-2" /> Propose New Match
             </Button>
           </DialogTrigger>
@@ -810,7 +812,33 @@ export default function Dashboard() {
               <div className="flex-1 space-y-4 overflow-y-auto pr-1">
                 <div className="space-y-2">
                   <Label htmlFor="gentleman" className="text-zinc-300 text-xs font-semibold uppercase tracking-wider">Select Gentleman (Male Candidates)</Label>
-                  <Select value={selectedGentlemanId} onValueChange={setSelectedGentlemanId}>
+                  
+                  {/* ID Search Input */}
+                  <Input 
+                    type="text" 
+                    placeholder="Search by ID (e.g. G15)..." 
+                    value={gentSearch}
+                    onChange={(e) => {
+                      const searchVal = e.target.value;
+                      setGentSearch(searchVal);
+                      const normalized = searchVal.trim().toUpperCase();
+                      if (normalized) {
+                        const found = gentlemen.find(g => 
+                          (g.code || '').toUpperCase().replace(/\s*[-_]?\s*/g, '') === normalized.replace(/\s*[-_]?\s*/g, '')
+                        );
+                        if (found) {
+                          setSelectedGentlemanId(found.id);
+                        }
+                      }
+                    }}
+                    className="bg-zinc-900 border-zinc-800 text-xs text-white h-9 rounded-md placeholder:text-zinc-600"
+                  />
+
+                  <Select value={selectedGentlemanId} onValueChange={(val) => {
+                    setSelectedGentlemanId(val);
+                    const found = gentlemen.find(g => g.id === val);
+                    if (found) setGentSearch(found.code || '');
+                  }}>
                     <SelectTrigger className="bg-zinc-900 border-zinc-800 text-white">
                       <SelectValue placeholder="Choose gentleman profile..." />
                     </SelectTrigger>
@@ -826,6 +854,21 @@ export default function Dashboard() {
                       )}
                     </SelectContent>
                   </Select>
+                  {selectedGentleman && (
+                    <div className="p-3 bg-muted/60 rounded-xl border border-indigo-500/10 space-y-1.5 animate-in fade-in duration-300">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-zinc-500 uppercase tracking-widest font-black">Identity Confirmed</span>
+                        <Badge className="bg-indigo-950 text-indigo-400 border border-indigo-500/20 text-xs font-black">{selectedGentleman.code}</Badge>
+                      </div>
+                      <p className="text-xs font-semibold text-zinc-200">{selectedGentleman.fullName || selectedGentleman.name}</p>
+                      <p className="text-xs text-zinc-400 leading-normal">
+                        {selectedGentleman.age} years old • {selectedGentleman.maritalStatus} • {selectedGentleman.religion} • {selectedGentleman.locationOfResidence}
+                      </p>
+                      <p className="text-xs text-zinc-500 leading-relaxed italic line-clamp-2">
+                        {selectedGentleman.currentJob} • {selectedGentleman.universityFieldOfStudy}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex justify-center text-zinc-600 font-bold text-sm py-1">
@@ -834,7 +877,33 @@ export default function Dashboard() {
 
                 <div className="space-y-2">
                   <Label htmlFor="lady" className="text-zinc-300 text-xs font-semibold uppercase tracking-wider">Select Lady (Female Candidates)</Label>
-                  <Select value={selectedLadyId} onValueChange={setSelectedLadyId}>
+                  
+                  {/* ID Search Input */}
+                  <Input 
+                    type="text" 
+                    placeholder="Search by ID (e.g. L20)..." 
+                    value={ladySearch}
+                    onChange={(e) => {
+                      const searchVal = e.target.value;
+                      setLadySearch(searchVal);
+                      const normalized = searchVal.trim().toUpperCase();
+                      if (normalized) {
+                        const found = ladies.find(l => 
+                          (l.code || '').toUpperCase().replace(/\s*[-_]?\s*/g, '') === normalized.replace(/\s*[-_]?\s*/g, '')
+                        );
+                        if (found) {
+                          setSelectedLadyId(found.id);
+                        }
+                      }
+                    }}
+                    className="bg-zinc-900 border-zinc-800 text-xs text-white h-9 rounded-md placeholder:text-zinc-600"
+                  />
+
+                  <Select value={selectedLadyId} onValueChange={(val) => {
+                    setSelectedLadyId(val);
+                    const found = ladies.find(l => l.id === val);
+                    if (found) setLadySearch(found.code || '');
+                  }}>
                     <SelectTrigger className="bg-zinc-900 border-zinc-800 text-white">
                       <SelectValue placeholder="Choose lady profile..." />
                     </SelectTrigger>
@@ -850,10 +919,27 @@ export default function Dashboard() {
                       )}
                     </SelectContent>
                   </Select>
+
+                  {/* Profile Identity Confirmation Box */}
+                  {selectedLady && (
+                    <div className="p-3 bg-muted/60 rounded-xl border border-pink-500/10 space-y-1.5 animate-in fade-in duration-300">
+                      <div className="flex justify-between items-center">
+                        <span className="text-xs text-zinc-500 uppercase tracking-widest font-black">Identity Confirmed</span>
+                        <Badge className="bg-pink-950 text-pink-400 border border-pink-500/20 text-xs font-black">{selectedLady.code}</Badge>
+                      </div>
+                      <p className="text-xs font-semibold text-zinc-200">{selectedLady.fullName || selectedLady.name}</p>
+                      <p className="text-xs text-zinc-400 leading-normal">
+                        {selectedLady.age} years old • {selectedLady.maritalStatus} • {selectedLady.religion} • {selectedLady.locationOfResidence}
+                      </p>
+                      <p className="text-xs text-zinc-500 leading-relaxed italic line-clamp-2">
+                        {selectedLady.currentJob} • {selectedLady.universityFieldOfStudy}
+                      </p>
+                    </div>
+                  )}
                 </div>
 
                 {compatibilityReport && (
-                  <Card className={`border p-4 rounded-xl space-y-3 relative overflow-hidden transition-all duration-500 bg-zinc-950/90 ${
+                  <Card className={`border p-4 rounded-xl space-y-3 relative overflow-hidden transition-all duration-500 bg-card/90 ${
                     compatibilityReport.percent >= 75 
                       ? 'border-emerald-500/20 shadow-lg shadow-emerald-950/10'
                       : compatibilityReport.percent >= 50
@@ -866,10 +952,10 @@ export default function Dashboard() {
                     }`} />
                     
                     <div className="flex justify-between items-center">
-                      <span className="text-[10px] font-black uppercase text-zinc-500 tracking-widest">Compatibility Audit</span>
+                      <span className="text-xs font-black uppercase text-zinc-500 tracking-widest">Compatibility Audit</span>
                       <Badge className={`text-xs font-black px-2.5 py-0.5 rounded-lg border flex items-center gap-1 ${
                         compatibilityReport.percent === 100 
-                          ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25 animate-pulse'
+                           ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/25 animate-pulse'
                           : compatibilityReport.percent >= 75
                           ? 'bg-teal-500/10 text-teal-400 border-teal-500/25'
                           : compatibilityReport.percent >= 50
@@ -888,9 +974,9 @@ export default function Dashboard() {
                       </Badge>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 pt-1 text-[11px]">
+                    <div className="grid grid-cols-2 gap-2 pt-1 text-xs">
                       {/* 1. Religion check */}
-                      <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-900/40 border border-white/5">
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-muted/40 border border-border">
                         <span className="text-zinc-400 flex items-center gap-1">Religion</span>
                         <div className="flex items-center gap-1 font-bold">
                           {compatibilityReport.religionMatch ? (
@@ -907,8 +993,8 @@ export default function Dashboard() {
                         </div>
                       </div>
 
-                      {/* 2. Age Range check */}
-                      <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-900/40 border border-white/5" title={`Gentleman (${compatibilityReport.gentAge}y) Pref: ${selectedGentleman?.preferredAgeRange || 'Any'}. Lady (${compatibilityReport.ladyAge}y) Pref: ${selectedLady?.preferredAgeRange || 'Any'}.`}>
+                      {/* 2. Age Preference check */}
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-muted/40 border border-border" title={`Gentleman (${compatibilityReport.gentAge}y) Pref: ${selectedGentleman?.preferredAgeRange || 'Any'}. Lady (${compatibilityReport.ladyAge}y) Pref: ${selectedLady?.preferredAgeRange || 'Any'}.`}>
                         <span className="text-zinc-400 flex items-center gap-1">Age Pref</span>
                         <div className="flex items-center gap-1 font-bold">
                           {compatibilityReport.ageMatch ? (
@@ -926,7 +1012,7 @@ export default function Dashboard() {
                       </div>
 
                       {/* 3. Location / Relocation check */}
-                      <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-900/40 border border-white/5" title={`Gentleman: ${selectedGentleman?.locationOfResidence || 'N/A'} (Relocate: ${selectedGentleman?.willingToRelocate || 'No'}). Lady: ${selectedLady?.locationOfResidence || 'N/A'} (Relocate: ${selectedLady?.willingToRelocate || 'No'}).`}>
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-muted/40 border border-border" title={`Gentleman: ${selectedGentleman?.locationOfResidence || 'N/A'} (Relocate: ${selectedGentleman?.willingToRelocate || 'No'}). Lady: ${selectedLady?.locationOfResidence || 'N/A'} (Relocate: ${selectedLady?.willingToRelocate || 'No'}).`}>
                         <span className="text-zinc-400 flex items-center gap-1">Location</span>
                         <div className="flex items-center gap-1 font-bold">
                           {compatibilityReport.locationMatch ? (
@@ -944,7 +1030,7 @@ export default function Dashboard() {
                       </div>
 
                       {/* 4. Hijab Preference check */}
-                      <div className="flex items-center justify-between p-2 rounded-lg bg-zinc-900/40 border border-white/5" title={`Gentleman Pref: ${selectedGentleman?.hijabPreference || 'Doesn\'t matter'}. Lady Status: ${selectedLady?.hijabPreference || 'No Hijab'}.`}>
+                      <div className="flex items-center justify-between p-2 rounded-lg bg-muted/40 border border-border" title={`Gentleman Pref: ${selectedGentleman?.hijabPreference || 'Doesn\'t matter'}. Lady Status: ${selectedLady?.hijabPreference || 'No Hijab'}.`}>
                         <span className="text-zinc-400 flex items-center gap-1">Hijab Pref</span>
                         <div className="flex items-center gap-1 font-bold">
                           {compatibilityReport.hijabMatch ? (
@@ -963,7 +1049,7 @@ export default function Dashboard() {
                     </div>
 
                     {/* Descriptive breakdown matching text */}
-                    <div className="text-[10px] text-zinc-400 leading-relaxed bg-zinc-900/20 p-2 rounded border border-white/5 font-mono">
+                    <div className="text-xs text-zinc-400 leading-relaxed bg-muted/20 p-2 rounded border border-border font-mono">
                       {compatibilityReport.percent === 100 && (
                         <span>✨ Both candidates satisfy all core checklist values. Excellent baseline matching score.</span>
                       )}
@@ -1001,10 +1087,10 @@ export default function Dashboard() {
               </div>
 
               <DialogFooter className="mt-auto pt-4 border-t border-white/5 flex gap-2 sm:flex-row flex-row-reverse">
-                <Button type="button" variant="outline" className="flex-1 sm:flex-none border-white/10 hover:bg-zinc-900 text-white active:scale-95 transition-all duration-150" onClick={() => setIsProposalOpen(false)}>
+                <Button type="button" variant="outline" className="flex-1 sm:flex-none border-white/10 hover:bg-zinc-900 text-white transition-all duration-150 btn-tactile-rebound" onClick={() => setIsProposalOpen(false)}>
                   Cancel
                 </Button>
-                <Button type="submit" className="flex-1 sm:flex-none bg-gradient-to-r from-pink-500 to-purple-600 text-white border-0 shadow-lg shadow-pink-500/20 hover:from-pink-600 hover:to-purple-700 active:scale-95 transition-all duration-150 font-semibold">
+                <Button type="submit" className="flex-1 sm:flex-none bg-gradient-to-r from-pink-500 to-purple-600 text-white border-0 shadow-lg shadow-pink-500/20 hover:from-pink-600 hover:to-purple-700 transition-all duration-150 font-semibold btn-tactile-rebound">
                   Launch Match Machine
                 </Button>
               </DialogFooter>
@@ -1015,11 +1101,11 @@ export default function Dashboard() {
 
       {/* Overview Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
-        <Card className="bg-zinc-950 border-white/5 shadow-2xl relative overflow-hidden group hover:scale-[1.03] active:scale-[0.98] hover:border-zinc-800 transition-all duration-300">
+        <Card className="bg-card border-border shadow-2xl relative overflow-hidden group hover:scale-[1.03] active:scale-[0.98] hover:border-zinc-800 transition-all duration-300">
           <div className="absolute right-0 top-0 h-16 w-16 bg-gradient-to-bl from-pink-500/10 to-transparent rounded-bl-full group-hover:from-pink-500/25 transition-all duration-500" />
           <CardContent className="p-3.5 sm:p-5 flex items-center justify-between gap-2">
             <div className="space-y-0.5 sm:space-y-1">
-              <span className="text-[10px] sm:text-xs text-zinc-400 font-semibold uppercase tracking-wider block leading-tight">Total Candidates</span>
+              <span className="text-xs text-zinc-400 font-semibold uppercase tracking-wider block leading-tight">Total Candidates</span>
               <p className="text-2xl sm:text-3xl font-extrabold text-white">{totalProfilesCount}</p>
             </div>
             <div className="h-8 w-8 sm:h-10 sm:w-10 bg-pink-500/10 rounded-lg sm:rounded-xl flex items-center justify-center text-pink-400 flex-shrink-0 group-hover:bg-pink-500/20 transition-colors duration-300">
@@ -1028,11 +1114,11 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="bg-zinc-950 border-white/5 shadow-2xl relative overflow-hidden group hover:scale-[1.03] active:scale-[0.98] hover:border-zinc-800 transition-all duration-300">
+        <Card className="bg-card border-border shadow-2xl relative overflow-hidden group hover:scale-[1.03] active:scale-[0.98] hover:border-zinc-800 transition-all duration-300">
           <div className="absolute right-0 top-0 h-16 w-16 bg-gradient-to-bl from-indigo-500/10 to-transparent rounded-bl-full group-hover:from-indigo-500/25 transition-all duration-500" />
           <CardContent className="p-3.5 sm:p-5 flex items-center justify-between gap-2">
             <div className="space-y-0.5 sm:space-y-1">
-              <span className="text-[10px] sm:text-xs text-zinc-400 font-semibold uppercase tracking-wider block leading-tight">Active Gentlemen</span>
+              <span className="text-xs text-zinc-400 font-semibold uppercase tracking-wider block leading-tight">Active Gentlemen</span>
               <p className="text-2xl sm:text-3xl font-extrabold text-indigo-400">{activeGentlemenCount}</p>
             </div>
             <div className="h-8 w-8 sm:h-10 sm:w-10 bg-indigo-500/10 rounded-lg sm:rounded-xl flex items-center justify-center text-indigo-400 flex-shrink-0 group-hover:bg-indigo-500/20 transition-colors duration-300">
@@ -1041,11 +1127,11 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="bg-zinc-950 border-white/5 shadow-2xl relative overflow-hidden group hover:scale-[1.03] active:scale-[0.98] hover:border-zinc-800 transition-all duration-300">
+        <Card className="bg-card border-border shadow-2xl relative overflow-hidden group hover:scale-[1.03] active:scale-[0.98] hover:border-zinc-800 transition-all duration-300">
           <div className="absolute right-0 top-0 h-16 w-16 bg-gradient-to-bl from-teal-500/10 to-transparent rounded-bl-full group-hover:from-teal-500/25 transition-all duration-500" />
           <CardContent className="p-3.5 sm:p-5 flex items-center justify-between gap-2">
             <div className="space-y-0.5 sm:space-y-1">
-              <span className="text-[10px] sm:text-xs text-zinc-400 font-semibold uppercase tracking-wider block leading-tight">Active Ladies</span>
+              <span className="text-xs text-zinc-400 font-semibold uppercase tracking-wider block leading-tight">Active Ladies</span>
               <p className="text-2xl sm:text-3xl font-extrabold text-teal-400">{activeLadiesCount}</p>
             </div>
             <div className="h-8 w-8 sm:h-10 sm:w-10 bg-teal-500/10 rounded-lg sm:rounded-xl flex items-center justify-center text-teal-400 flex-shrink-0 group-hover:bg-teal-500/20 transition-colors duration-300">
@@ -1054,11 +1140,11 @@ export default function Dashboard() {
           </CardContent>
         </Card>
 
-        <Card className="bg-zinc-950 border-white/5 shadow-2xl relative overflow-hidden group hover:scale-[1.03] active:scale-[0.98] hover:border-zinc-800 transition-all duration-300">
+        <Card className="bg-card border-border shadow-2xl relative overflow-hidden group hover:scale-[1.03] active:scale-[0.98] hover:border-zinc-800 transition-all duration-300">
           <div className="absolute right-0 top-0 h-16 w-16 bg-gradient-to-bl from-rose-500/10 to-transparent rounded-bl-full group-hover:from-rose-500/25 transition-all duration-500" />
           <CardContent className="p-3.5 sm:p-5 flex items-center justify-between gap-2">
             <div className="space-y-0.5 sm:space-y-1">
-              <span className="text-[10px] sm:text-xs text-zinc-400 font-semibold uppercase tracking-wider block leading-tight">Proposed Matches</span>
+              <span className="text-xs text-zinc-400 font-semibold uppercase tracking-wider block leading-tight">Proposed Matches</span>
               <p className="text-2xl sm:text-3xl font-extrabold text-rose-400">{activeMatchesCount}</p>
             </div>
             <div className="h-8 w-8 sm:h-10 sm:w-10 bg-rose-500/10 rounded-lg sm:rounded-xl flex items-center justify-center text-rose-400 flex-shrink-0 group-hover:bg-rose-500/20 transition-colors duration-300">
@@ -1070,8 +1156,8 @@ export default function Dashboard() {
 
       {/* Date & Meeting Scheduler Overview Panel */}
       {matchMeetings.length > 0 && (
-        <Card className="bg-zinc-950/60 border border-white/10 shadow-2xl overflow-hidden rounded-2xl backdrop-blur-md">
-          <CardHeader className="border-b border-white/5 bg-zinc-900/20 p-4 sm:p-5 flex flex-row items-center justify-between">
+        <Card className="bg-card/60 border border-border shadow-2xl overflow-hidden rounded-2xl backdrop-blur-md">
+          <CardHeader className="border-b border-border bg-muted/20 p-4 sm:p-5 flex flex-row items-center justify-between">
             <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
               <CalendarDays className="h-4.5 w-4.5 text-pink-500" /> Active Dates & Match Consultations ({matchMeetings.length})
             </CardTitle>
@@ -1081,19 +1167,19 @@ export default function Dashboard() {
               {[...matchMeetings].reverse().map(meeting => {
                 const client = profiles.find(p => p.id === meeting.clientId);
                 return (
-                  <div key={meeting.id} className="flex items-center justify-between p-3.5 rounded-2xl bg-zinc-900/40 border border-white/5 shadow-sm text-xs transition-all hover:scale-[1.01]">
+                  <div key={meeting.id} className="flex items-center justify-between p-3.5 rounded-2xl bg-muted/40 border border-border shadow-sm text-xs transition-all hover:scale-[1.01]">
                     <div className="space-y-1 min-w-0 flex-1">
                       <div className="flex items-center gap-1.5">
-                        <Badge className="bg-pink-500/10 text-pink-400 border border-pink-500/20 text-[9px] font-bold uppercase tracking-wider px-2 py-0.5 rounded-lg shrink-0">{client?.code || 'C-XXX'}</Badge>
+                        <Badge className="bg-pink-500/10 text-pink-400 border border-pink-500/20 text-xs font-bold uppercase tracking-wider px-2 py-0.5 rounded-lg shrink-0">{client?.code || 'C-XXX'}</Badge>
                         <span className="font-bold text-zinc-200 truncate">{client?.fullName || client?.name || 'Anonymous Candidate'}</span>
                       </div>
-                      <p className="text-[10px] text-zinc-500 flex items-center gap-1.5">
-                        <span>Venue/Method:</span> <strong className="text-zinc-300 font-semibold uppercase tracking-wider text-[9px]">{meeting.branch}</strong>
+                      <p className="text-xs text-zinc-500 flex items-center gap-1.5">
+                        <span>Venue/Method:</span> <strong className="text-zinc-300 font-semibold uppercase tracking-wider text-xs">{meeting.branch}</strong>
                       </p>
                     </div>
                     <div className="text-right flex-shrink-0 ml-3">
-                      <p className="font-bold text-pink-400 font-mono text-[11px]">{new Date(meeting.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
-                      <p className="text-[9px] text-zinc-500 uppercase font-bold tracking-widest mt-0.5">Confirmed</p>
+                      <p className="font-bold text-pink-400 font-mono text-xs">{new Date(meeting.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}</p>
+                      <p className="text-xs text-zinc-500 uppercase font-bold tracking-widest mt-0.5">Confirmed</p>
                     </div>
                   </div>
                 );
@@ -1114,17 +1200,17 @@ export default function Dashboard() {
               key={col.status}
               type="button"
               onClick={() => setActiveColIndex(index)}
-              className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 snap-center border ${
+              className={`flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold transition-all duration-300 snap-center border btn-tactile-rebound ${
                 isActive 
-                  ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white border-pink-500/30 shadow-lg shadow-pink-500/20 scale-95'
+                  ? 'bg-gradient-to-r from-pink-500 to-purple-600 text-white border-pink-500/30 shadow-lg shadow-pink-500/20'
                   : 'bg-muted/50 hover:bg-muted text-muted-foreground border-border hover:text-foreground'
               }`}
             >
-              <span className="flex h-5 w-5 items-center justify-center rounded-full text-[10px] bg-white/10 text-white font-extrabold">
+              <span className="flex h-5 w-5 items-center justify-center rounded-full text-xs bg-white/10 text-white font-extrabold">
                 {index + 1}
               </span>
               <span className="tracking-wide">{col.title.replace(/^\d+\.\s*/, '')}</span>
-              <Badge variant="outline" className={`h-4 min-w-4 px-1 flex items-center justify-center text-[9px] border-none font-black ${
+              <Badge variant="outline" className={`h-4 min-w-4 px-1 flex items-center justify-center text-xs border-none font-black ${
                 isActive ? 'bg-white/20 text-white animate-pulse' : 'bg-muted text-muted-foreground'
               }`}>
                 {colMatchesCount}
@@ -1205,10 +1291,10 @@ export default function Dashboard() {
             </div>
 
             <DialogFooter className="mt-auto pt-4 border-t border-border flex gap-2 sm:flex-row flex-row-reverse">
-              <Button type="button" variant="outline" className="flex-1 sm:flex-none border-border hover:bg-muted text-foreground active:scale-95 transition-all duration-150" onClick={() => setIsScheduleOpen(false)}>
+              <Button type="button" variant="outline" className="flex-1 sm:flex-none border-border hover:bg-muted text-foreground transition-all duration-150 btn-tactile-rebound" onClick={() => setIsScheduleOpen(false)}>
                 Cancel
               </Button>
-              <Button type="submit" className="flex-1 sm:flex-none bg-gradient-to-r from-pink-500 to-purple-600 text-white border-0 shadow-lg shadow-pink-500/20 hover:from-pink-600 hover:to-purple-700 active:scale-95 transition-all duration-150 font-semibold">
+              <Button type="submit" className="flex-1 sm:flex-none bg-gradient-to-r from-pink-500 to-purple-600 text-white border-0 shadow-lg shadow-pink-500/20 hover:from-pink-600 hover:to-purple-700 transition-all duration-150 font-semibold btn-tactile-rebound">
                 Confirm Date & Log
               </Button>
             </DialogFooter>

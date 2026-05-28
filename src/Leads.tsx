@@ -1148,7 +1148,7 @@ export default function Leads() {
         {/* Mobile Filter Drawer Overlay */}
         <div className={`fixed inset-0 z-50 transition-all duration-300 ${isMobileFilterOpen ? 'opacity-100 pointer-events-auto' : 'opacity-0 pointer-events-none'}`}>
           <div className="absolute inset-0 bg-black/80 backdrop-blur-sm" onClick={() => setIsMobileFilterOpen(false)} />
-          <div className={`fixed bottom-0 left-0 right-0 max-h-[85vh] bg-zinc-950 border-t border-white/10 rounded-t-3xl p-6 overflow-y-auto transition-transform duration-300 transform ${isMobileFilterOpen ? 'translate-y-0' : 'translate-y-full'} text-white space-y-6`}>
+          <div className={`fixed bottom-0 left-0 right-0 max-h-[85vh] bg-zinc-950 border-t border-white/10 rounded-t-3xl p-6 pb-[calc(1.5rem+env(safe-area-inset-bottom,0px))] overflow-y-auto transition-transform duration-300 transform ${isMobileFilterOpen ? 'translate-y-0' : 'translate-y-full'} text-white space-y-6`}>
             <div className="flex justify-between items-center border-b border-white/5 pb-3">
               <h3 className="text-base font-bold flex items-center gap-2">
                 <Filter className="h-5 w-5 text-pink-400" /> Advanced Filters

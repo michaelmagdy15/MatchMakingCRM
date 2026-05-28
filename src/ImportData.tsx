@@ -10,15 +10,13 @@ import { Progress } from '@/components/ui/progress';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Client, MatchStatus } from './types';
 import { Input } from '@/components/ui/input';
-
-const validateGucId = (gucId: string): boolean => {
-  const regex = /^\d{2}-\d{4,6}$/;
-  return regex.test(gucId.trim());
-};
-
-const sanitizeGucId = (gucId: string): string => {
-  return gucId.trim().replace(/[_/]/g, '-');
-};
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import {   parseAge, 
+  sanitizeGucId, 
+  validateGucId, 
+  sanitizeCandidateCode, 
+  validateCandidateCode 
+} from './utils/cleansing';
 
 interface ImportDataProps {
   type?: 'Lead' | 'Active' | 'Match';
@@ -82,7 +80,6 @@ export default function ImportData({ type = 'Lead', isOpen: controlledIsOpen, on
     { key: 'willingToRelocate', label: 'Willing to Relocate?' },
     { key: 'partnerPreferences', label: 'Partner Preferences' },
     { key: 'selfIntroduction', label: 'Self Introduction' },
-    { key: 'preferOlderOrYounger', label: 'Prefer Older or Younger?' },
   ];
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -280,36 +277,11 @@ export default function ImportData({ type = 'Lead', isOpen: controlledIsOpen, on
             if (!match) match = parsedHeaders.find(h => aliases.some(alias => h.toLowerCase().includes(alias)));
             if (match) newMapping[field.key] = match;
           });
-          const hasGentleman = newMapping['gentlemanCode'];
-          const hasLady = newMapping['ladyCode'];
-
-          if (type === 'Match') {
-            if (!hasGentleman || !hasLady) {
-              setHeaders(parsedHeaders);
-              setData(results.data);
-              setMapping(newMapping);
-              setStep('map');
-              setIsLoading(false);
-              return;
-            }
-          } else {
-            const hasName = newMapping['fullName'] || newMapping['name'];
-            const hasPhone = newMapping['phoneNumber'] || newMapping['phone'];
-            const hasGender = newMapping['gender'];
-
-            if (!hasName || !hasPhone || !hasGender) {
-              setHeaders(parsedHeaders);
-              setData(results.data);
-              setMapping(newMapping);
-              setStep('map');
-              setIsLoading(false);
-              return;
-            }
-          }
-
+          setHeaders(parsedHeaders);
           setData(results.data);
           setMapping(newMapping);
-          await performImport(results.data, newMapping);
+          setStep('map');
+          setIsLoading(false);
         }
       });
     } catch (err) {
@@ -534,17 +506,17 @@ export default function ImportData({ type = 'Lead', isOpen: controlledIsOpen, on
         let code = '';
         let memberId = '';
         if (codeCol && row[codeCol]) {
-          const customCode = row[codeCol].toString().trim().toUpperCase();
-          if (!/^[LG]\s*[-_]?\s*\d+$/i.test(customCode)) {
+          const rawCode = row[codeCol].toString().trim();
+          const customCode = sanitizeCandidateCode(rawCode);
+          if (!validateCandidateCode(customCode)) {
             failedCount++;
-            errors.push({ row: i + 1, reason: `Invalid custom candidate code format: "${customCode}" (must start with L or G followed by numbers)` });
+            errors.push({ row: i + 1, reason: `Invalid custom candidate code format: "${rawCode}" (must start with L or G followed by numbers)` });
             continue;
           }
 
           // Check if custom code already exists in rawClients or in current batch
-          const normalizedCustom = customCode.replace(/\s*[-_]?\s*/g, '');
-          const isDuplicateCode = rawClients.some(c => (c.code || c.memberId || '').toString().trim().toUpperCase().replace(/\s*[-_]?\s*/g, '') === normalizedCustom) ||
-                                  clientsToImport.some(c => (c.code || '').toUpperCase().replace(/\s*[-_]?\s*/g, '') === normalizedCustom);
+          const isDuplicateCode = rawClients.some(c => (c.code || c.memberId || '').toString().trim().toUpperCase() === customCode) ||
+                                  clientsToImport.some(c => (c.code || '').toUpperCase() === customCode);
           if (isDuplicateCode) {
             failedCount++;
             errors.push({ row: i + 1, reason: `Duplicate candidate code: "${customCode}" already exists in the database` });
@@ -614,14 +586,14 @@ export default function ImportData({ type = 'Lead', isOpen: controlledIsOpen, on
 
         const ageCol = importMapping['age'];
         if (ageCol && row[ageCol] !== undefined && row[ageCol] !== null && row[ageCol] !== '') {
-          const parsedAge = parseInt(row[ageCol].toString().trim(), 10);
-          if (isNaN(parsedAge) || parsedAge < 18 || parsedAge > 99) {
+          try {
+            const parsedAge = parseAge(row[ageCol]);
+            profileData.age = parsedAge;
+          } catch (e: any) {
             failedCount++;
-            errors.push({ row: i + 1, reason: `Invalid age: "${row[ageCol]}" (must be a number between 18 and 99).` });
+            errors.push({ row: i + 1, reason: `Invalid age or date of birth: "${row[ageCol]}". Error: ${e.message}` });
             continue;
           }
-          profileData.age = parsedAge;
-          profileData.finalAge = parsedAge;
         }
 
         // Email format validation
@@ -675,7 +647,6 @@ export default function ImportData({ type = 'Lead', isOpen: controlledIsOpen, on
           'willingToRelocate',
           'partnerPreferences',
           'selfIntroduction',
-          'preferOlderOrYounger',
         ];
 
         stringFields.forEach(fieldKey => {
@@ -734,7 +705,7 @@ export default function ImportData({ type = 'Lead', isOpen: controlledIsOpen, on
           }
         />
       )}
-      <DialogContent className="max-w-xl">
+      <DialogContent className={step === 'map' ? "max-w-4xl w-[90vw] bg-zinc-950 border-white/10 text-white rounded-3xl" : "max-w-xl bg-zinc-950 border-white/10 text-white rounded-3xl"}>
         <DialogHeader>
           <DialogTitle>Import {type === 'Match' ? 'Old Matches' : type === 'Active' ? 'Active Candidates' : 'Lead Candidates'} from CSV / Google Sheets</DialogTitle>
         </DialogHeader>
@@ -814,42 +785,65 @@ export default function ImportData({ type = 'Lead', isOpen: controlledIsOpen, on
         )}
 
         {step === 'map' && (
-          <div className="space-y-4 py-4">
-            <p className="text-sm text-muted-foreground">Map CSV columns to matchmaking fields:</p>
-            <ScrollArea className="h-[300px] w-full rounded-md border p-4 bg-muted/20">
-              <div className="grid gap-4">
-                {fields.map(field => (
-                  <div key={field.key} className="grid grid-cols-2 items-center gap-4">
-                    <Label className="text-xs font-semibold">{field.label}</Label>
-                    <Select 
-                      value={mapping[field.key] || 'none'} 
-                      onValueChange={(val) => setMapping(prev => ({ ...prev, [field.key]: val === 'none' ? '' : val }))}
-                    >
-                      <SelectTrigger className="h-8 text-xs">
-                        <SelectValue placeholder="Select column" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Don't import</SelectItem>
-                        {headers.map(h => (
-                          <SelectItem key={h} value={h}>{h}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                ))}
+          <div className="space-y-4 py-4 w-full text-white animate-in fade-in duration-300">
+            <p className="text-sm text-zinc-400">Map CSV columns to GUC Matchmaking fields:</p>
+            <ScrollArea className="h-[400px] w-full rounded-2xl border border-white/5 bg-zinc-950/40 p-2 overflow-x-auto">
+              <div className="min-w-[650px] pr-2">
+                <Table>
+                  <TableHeader>
+                    <TableRow className="border-white/5 hover:bg-transparent">
+                      <TableHead className="w-1/2 text-zinc-450 text-xs font-bold uppercase tracking-wider">GUC Database Field</TableHead>
+                      <TableHead className="w-1/2 text-zinc-450 text-xs font-bold uppercase tracking-wider">CSV Spreadsheet Header (Long Sentence)</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {fields.map(field => {
+                      const isMapped = !!mapping[field.key];
+                      return (
+                        <TableRow key={field.key} className={`border-white/5 hover:bg-zinc-900/40 transition-colors ${isMapped ? 'bg-emerald-950/10' : ''}`}>
+                          <TableCell className="align-middle py-3">
+                            <div className="flex flex-col space-y-0.5">
+                              <span className="text-xs font-semibold text-zinc-200">{field.label}</span>
+                              <span className="text-[10px] text-zinc-500 italic font-medium">Field ID: {field.key}{field.required ? ' *' : ''}</span>
+                            </div>
+                          </TableCell>
+                          <TableCell className="align-middle py-3">
+                            <Select 
+                              value={mapping[field.key] || 'none'} 
+                              onValueChange={(val) => setMapping(prev => ({ ...prev, [field.key]: val === 'none' ? '' : val }))}
+                            >
+                              <SelectTrigger className="h-9 text-xs bg-zinc-900 border-zinc-800 text-white rounded-xl w-full">
+                                <SelectValue placeholder="Select column header..." />
+                              </SelectTrigger>
+                              <SelectContent className="bg-zinc-900 border-zinc-800 text-white max-w-[450px]">
+                                <SelectItem value="none">Don't import / Skip field</SelectItem>
+                                {headers.map(h => (
+                                  <SelectItem key={h} value={h} className="text-xs break-words whitespace-normal leading-snug py-2">
+                                    {h}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
               </div>
             </ScrollArea>
-            <div className="pt-4">
-              <p className="text-xs text-muted-foreground italic">
-                Found {data.length} rows in the file.
-              </p>
+            <div className="flex justify-between items-center pt-2 text-xs text-zinc-450 font-medium">
+              <span>Found <strong className="text-zinc-200">{data.length}</strong> rows in the sheet.</span>
+              {isManualMapDisabled && (
+                <span className="text-rose-500 font-bold animate-pulse">Required mapping columns are missing!</span>
+              )}
             </div>
             <Button 
-              className="w-full" 
+              className="w-full bg-gradient-to-r from-pink-500 to-purple-600 text-white border-0 shadow-lg font-bold hover:from-pink-600 hover:to-purple-700 h-10 rounded-xl transition-all" 
               onClick={handleImport}
               disabled={isManualMapDisabled}
             >
-              Start Import
+              Start Import Process
             </Button>
           </div>
         )}

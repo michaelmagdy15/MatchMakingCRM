@@ -48,6 +48,11 @@
     --radius-2xl: calc(var(--radius) * 1.8);
     --radius-3xl: calc(var(--radius) * 2.2);
     --radius-4xl: calc(var(--radius) * 2.6);
+    --color-zinc-450: oklch(0.60 0.01 250);
+    --color-zinc-555: oklch(0.50 0.01 250);
+    --color-emerald-450: oklch(0.62 0.17 150);
+    --color-rose-350: oklch(0.68 0.16 20);
+    --color-rose-450: oklch(0.58 0.18 20);
 }
 
 :root {
@@ -140,5 +145,26 @@
   .no-scrollbar {
     -ms-overflow-style: none;
     scrollbar-width: none;
+  }
+}
+
+.safe-top-padding { padding-top: env(safe-area-inset-top, 0px); }
+.safe-bottom-padding { padding-bottom: env(safe-area-inset-bottom, 0px); }
+.safe-bottom-margin { margin-bottom: env(safe-area-inset-bottom, 0px); }
+
+/* Tactile Animation Rebound Utility */
+.btn-tactile-rebound {
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-tactile-rebound:active {
+  transform: scale(0.96);
+}
+
+/* Isolate touchscreen hover highlights to prevent sticky states on mobile */
+@media (hover: hover) {
+  .btn-tactile-rebound:hover {
+    transform: scale(1.02);
+    filter: brightness(1.05);
   }
 }

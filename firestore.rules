@@ -111,16 +111,16 @@ service cloud.firestore {
     }
 
     function isValidPayment(data) {
-      return data.clientId is string &&
+      return data.client_id is string &&
              data.amount_paid is number && data.amount_paid >= 0 &&
              data.sales_rep_id is string;
     }
 
     function isValidMatch(data) {
-      return data.maleId is string && data.maleId.size() > 0 &&
-             data.maleName is string && data.maleName.size() > 0 &&
-             data.femaleId is string && data.femaleId.size() > 0 &&
-             data.femaleName is string && data.femaleName.size() > 0 &&
+      return data.male_id is string && data.male_id.size() > 0 &&
+             data.male_name is string && data.male_name.size() > 0 &&
+             data.female_id is string && data.female_id.size() > 0 &&
+             data.female_name is string && data.female_name.size() > 0 &&
              data.status in [
                "PENDING_PROFILE_APPROVAL",
                "PENDING_PHOTO_APPROVAL",
